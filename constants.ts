@@ -31,7 +31,7 @@ export const UI_TEXT = {
     placeholder: "Transmit to Nexus Core...",
     loginTitle: "Nexus Core Access",
     loginSubtitle: "Authenticate to access neural network",
-    emailPlaceholder: "Access ID (Email)",
+    emailPlaceholder: "Access ID (Email or Phone)",
     namePlaceholder: "Display Name",
     connectBtn: "Initialize Connection",
     createBtn: "Create Neural Link",
@@ -49,6 +49,9 @@ export const UI_TEXT = {
     signUp: "Sign Up",
     welcomeBack: "Welcome back, Commander.",
     joinNexus: "Initialize new identity.",
+    authErrorUserNotFound: "Identity not found. Please register.",
+    authErrorUserExists: "Identity already registered. Please sign in.",
+    authErrorGeneric: "Authentication failed.",
   },
   zh: {
     newChat: "新建会话",
@@ -56,7 +59,7 @@ export const UI_TEXT = {
     placeholder: "向 Nexus 核心发送指令...",
     loginTitle: "Nexus 核心接入",
     loginSubtitle: "验证身份以连接神经网络",
-    emailPlaceholder: "访问 ID (电子邮箱)",
+    emailPlaceholder: "访问 ID (邮箱或手机号)",
     namePlaceholder: "显示名称",
     connectBtn: "初始化连接",
     createBtn: "建立神经链接",
@@ -74,5 +77,8 @@ export const UI_TEXT = {
     signUp: "注册",
     welcomeBack: "欢迎回来，指挥官。",
     joinNexus: "初始化新身份。",
+    authErrorUserNotFound: "未找到该身份，请先注册。",
+    authErrorUserExists: "该身份已存在，请直接登录。",
+    authErrorGeneric: "验证失败。",
   }
 };

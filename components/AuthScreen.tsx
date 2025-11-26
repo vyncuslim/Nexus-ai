@@ -3,21 +3,33 @@ import { User, Language } from '../types';
 import { UI_TEXT } from '../constants';
 
 interface AuthScreenProps {
-  onLogin: (email: string, name?: string) => void;
+  onAuth: (email: string, isLoginMode: boolean, name?: string) => string | null;
   language: Language;
 }
 
-const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, language }) => {
+const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, language }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  
   const t = UI_TEXT[language];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    
     if (email.trim()) {
-      onLogin(email.trim(), isLogin ? undefined : name.trim());
+      const resultError = onAuth(email.trim(), isLogin, isLogin ? undefined : name.trim());
+      if (resultError) {
+        setError(resultError);
+      }
     }
+  };
+
+  const switchMode = (loginMode: boolean) => {
+    setIsLogin(loginMode);
+    setError(null);
   };
 
   return (
@@ -40,17 +52,17 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, language }) => {
         </div>
 
         {/* Form Container */}
-        <div className="bg-nexus-800/50 backdrop-blur-xl border border-nexus-700 rounded-3xl p-1 shadow-2xl">
+        <div className="bg-nexus-800/50 backdrop-blur-xl border border-nexus-700 rounded-3xl p-1 shadow-2xl transition-all duration-300">
           {/* Tabs */}
           <div className="grid grid-cols-2 p-1 mb-2 bg-nexus-900/50 rounded-2xl">
              <button 
-               onClick={() => setIsLogin(true)}
+               onClick={() => switchMode(true)}
                className={`py-3 rounded-xl text-sm font-semibold transition-all ${isLogin ? 'bg-nexus-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
              >
                {t.signIn}
              </button>
              <button 
-               onClick={() => setIsLogin(false)}
+               onClick={() => switchMode(false)}
                className={`py-3 rounded-xl text-sm font-semibold transition-all ${!isLogin ? 'bg-nexus-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
              >
                {t.signUp}
@@ -68,6 +80,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, language }) => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-200 text-xs text-center animate-pulse">
+                  {error}
+                </div>
+              )}
+
               {!isLogin && (
                 <div>
                   <input 
@@ -83,7 +101,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, language }) => {
               
               <div>
                 <input 
-                  type="email" 
+                  type="text" 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-nexus-900/80 border border-nexus-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-nexus-accent focus:ring-1 focus:ring-nexus-accent transition-all font-mono placeholder-gray-600 text-sm"

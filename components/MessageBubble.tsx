@@ -8,6 +8,7 @@ interface MessageBubbleProps {
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const isUser = message.role === Role.USER;
+  const isError = message.isError;
 
   // Basic formatting for code blocks and bold text (lightweight solution)
   const formatText = (text: string) => {
@@ -32,7 +33,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         {/* Avatar */}
         <div className={`
           flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-          ${isUser ? 'bg-nexus-accent' : 'bg-emerald-600'}
+          ${isUser ? 'bg-nexus-accent' : isError ? 'bg-red-600' : 'bg-emerald-600'}
           shadow-lg
         `}>
           {isUser ? <UserIcon /> : <RobotIcon />}
@@ -40,14 +41,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
         {/* Bubble */}
         <div className={`
-          relative px-4 py-3 rounded-2xl shadow-sm
+          relative px-4 py-3 rounded-2xl shadow-sm border
           ${isUser 
-            ? 'bg-nexus-700 text-white rounded-tr-sm' 
-            : 'bg-nexus-800 text-gray-100 rounded-tl-sm border border-nexus-700'}
+            ? 'bg-nexus-700 text-white rounded-tr-sm border-transparent' 
+            : isError 
+              ? 'bg-red-900/20 text-red-200 border-red-500/50 rounded-tl-sm' 
+              : 'bg-nexus-800 text-gray-100 rounded-tl-sm border-nexus-700'}
         `}>
           {/* Label */}
-          <div className="text-xs font-semibold opacity-50 mb-1">
-            {isUser ? 'You' : 'Nexus'}
+          <div className="text-xs font-semibold opacity-50 mb-1 flex justify-between">
+            <span>{isUser ? 'You' : 'Nexus'}</span>
+            {isError && <span className="text-red-400 ml-2">ERROR</span>}
           </div>
           
           <div className="text-sm md:text-base">

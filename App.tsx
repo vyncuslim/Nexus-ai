@@ -90,7 +90,6 @@ function App() {
       localStorage.setItem(STORAGE_KEY_SESSIONS_PREFIX + userId, JSON.stringify(updatedSessions));
     } catch (e) {
       console.error("Storage limit reached or error saving sessions", e);
-      // In a production app, we might want to alert the user here or delete old sessions.
     }
   };
 
@@ -122,8 +121,8 @@ function App() {
     }
   };
 
-  const handleLogin = (email: string, name?: string) => {
-    // Load local "User DB" to simulate persistence of profiles
+  // Strict Authentication Logic
+  const handleAuth = (email: string, isLoginMode: boolean, name?: string): string | null => {
     let usersDb: Record<string, User> = {};
     try {
       const usersDbStr = localStorage.getItem(STORAGE_KEY_USERS_DB);
@@ -133,35 +132,42 @@ function App() {
     }
     
     const userId = btoa(email.toLowerCase().trim()); // Simple ID generation
-    let finalUser: User;
+    const t = UI_TEXT[language];
 
-    if (name) {
-      // Sign Up: Create or Update user with provided name
-      finalUser = { id: userId, email, name };
-      usersDb[userId] = finalUser;
-    } else {
-      // Sign In: Try to find user
+    if (isLoginMode) {
+      // Login Mode: STRICT CHECK
       if (usersDb[userId]) {
-        finalUser = usersDb[userId];
+        // Success
+        const finalUser = usersDb[userId];
+        setUser(finalUser);
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(finalUser));
+        loadSessions(finalUser.id);
+        return null; // No error
       } else {
-        // Fallback: Create a temporary profile if they never signed up
-        // This handles "I haven't registered but can login" scenario
-        const generatedName = email.split('@')[0];
-        finalUser = { id: userId, email, name: generatedName };
-        usersDb[userId] = finalUser; // Save this so next time "Sign In" remembers the auto-generated name
+        // Error: User not found
+        return language === 'zh' ? UI_TEXT.zh.authErrorUserNotFound : UI_TEXT.en.authErrorUserNotFound;
+      }
+    } else {
+      // Register Mode: STRICT CHECK
+      if (usersDb[userId]) {
+        // Error: User already exists
+        return language === 'zh' ? UI_TEXT.zh.authErrorUserExists : UI_TEXT.en.authErrorUserExists;
+      } else {
+        // Success: Create User
+        if (!name) return "Name required"; // Should be caught by form, but safe check
+        const finalUser = { id: userId, email, name };
+        usersDb[userId] = finalUser;
+        
+        try {
+          localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDb));
+        } catch (e) { console.error("Error saving user DB", e); }
+
+        setUser(finalUser);
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(finalUser));
+        loadSessions(finalUser.id);
+        return null;
       }
     }
-
-    // Save User DB
-    try {
-      localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDb));
-    } catch (e) { console.error("Error saving user DB", e); }
-
-    // Set Active Session User
-    setUser(finalUser);
-    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(finalUser));
-    
-    loadSessions(finalUser.id);
   };
 
   const handleLogout = () => {
@@ -262,8 +268,7 @@ function App() {
 
     targetSession.messages.push(initialModelMsg);
     setSessions([...updatedSessions]);
-    // Note: We don't save strictly here to avoid double IO during quick interactions.
-
+    
     try {
       // 3. Stream Response
       const finalResponseText = await streamGeminiResponse(
@@ -290,7 +295,9 @@ function App() {
         const sess = newSessions.find(s => s.id === targetSessionId);
         if (sess) {
           const msg = sess.messages.find(m => m.id === modelMsgId);
-          if (msg) msg.text = finalResponseText; // Ensure exact match
+          if (msg) {
+            msg.text = finalResponseText; // Ensure exact match
+          }
           sess.updatedAt = Date.now();
         }
         // Persist to local storage
@@ -328,7 +335,7 @@ function App() {
   const t = UI_TEXT[language];
 
   if (!user) {
-    return <AuthScreen onLogin={handleLogin} language={language} />;
+    return <AuthScreen onAuth={handleAuth} language={language} />;
   }
 
   const activeMessages = getCurrentMessages();
