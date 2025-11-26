@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
 import AuthScreen from './components/AuthScreen';
-import { SendIcon, MenuIcon, ChevronDownIcon, ActivityIcon } from './components/Icon';
+import { SendIcon, MenuIcon, ChevronDownIcon, ActivityIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon } from './components/Icon';
 import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, UI_TEXT } from './constants';
-import { ChatMessage, Role, ModelConfig, ChatSession, User, Language } from './types';
-import { streamGeminiResponse } from './services/geminiService';
+import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, Attachment } from './types';
+import { streamGeminiResponse, generateImage, generateVideo } from './services/geminiService';
 import { v4 as uuidv4 } from 'uuid';
 
 function App() {
@@ -25,6 +25,10 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelConfig>(GEMINI_MODELS[0]);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  
+  // Media Config State
+  const [imageSize, setImageSize] = useState("1K");
+  const [videoAspectRatio, setVideoAspectRatio] = useState("16:9");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -62,6 +66,19 @@ function App() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isLoading]);
+
+  // Keyboard Shortcuts (Global)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Alt+N for New Chat
+      if (e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        createNewSession();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [user, sessions]); // Deps needed for createNewSession context
 
   // --- Session Management Helpers ---
   const loadSessions = (userId: string) => {
@@ -105,7 +122,7 @@ function App() {
     const updatedSessions = [newSession, ...sessions];
     setSessions(updatedSessions);
     setCurrentSessionId(newSession.id);
-    setSidebarOpen(false); // Close sidebar on mobile when creating new chat
+    setSidebarOpen(false); // Close sidebar on mobile
     saveSessionsToStorage(updatedSessions, user.id);
   };
 
@@ -121,7 +138,7 @@ function App() {
     }
   };
 
-  // Strict Authentication Logic
+  // --- Authentication & User Logic ---
   const handleAuth = (email: string, isLoginMode: boolean, name?: string): string | null => {
     let usersDb: Record<string, User> = {};
     try {
@@ -132,29 +149,22 @@ function App() {
     }
     
     const userId = btoa(email.toLowerCase().trim()); // Simple ID generation
-    const t = UI_TEXT[language];
-
+    
     if (isLoginMode) {
-      // Login Mode: STRICT CHECK
       if (usersDb[userId]) {
-        // Success
         const finalUser = usersDb[userId];
         setUser(finalUser);
         localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(finalUser));
         loadSessions(finalUser.id);
-        return null; // No error
+        return null;
       } else {
-        // Error: User not found
         return language === 'zh' ? UI_TEXT.zh.authErrorUserNotFound : UI_TEXT.en.authErrorUserNotFound;
       }
     } else {
-      // Register Mode: STRICT CHECK
       if (usersDb[userId]) {
-        // Error: User already exists
         return language === 'zh' ? UI_TEXT.zh.authErrorUserExists : UI_TEXT.en.authErrorUserExists;
       } else {
-        // Success: Create User
-        if (!name) return "Name required"; // Should be caught by form, but safe check
+        if (!name) return "Name required";
         const finalUser = { id: userId, email, name };
         usersDb[userId] = finalUser;
         
@@ -168,6 +178,23 @@ function App() {
         return null;
       }
     }
+  };
+
+  const updateUserAvatar = (avatarBase64: string) => {
+    if (!user) return;
+    const updatedUser = { ...user, avatar: avatarBase64 };
+    setUser(updatedUser);
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
+    
+    // Update DB
+    try {
+      const usersDbStr = localStorage.getItem(STORAGE_KEY_USERS_DB);
+      if (usersDbStr) {
+        const usersDb = JSON.parse(usersDbStr);
+        usersDb[user.id] = updatedUser;
+        localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDb));
+      }
+    } catch (e) { console.error(e); }
   };
 
   const handleLogout = () => {
@@ -184,7 +211,7 @@ function App() {
     localStorage.setItem(STORAGE_KEY_PREFS, JSON.stringify({ language: newLang }));
   };
 
-  // --- UI Helpers ---
+  // --- Chat & Generation Logic ---
   const getCurrentMessages = () => {
     const session = sessions.find(s => s.id === currentSessionId);
     return session ? session.messages : [];
@@ -205,20 +232,62 @@ function App() {
     }
   }, [inputValue]);
 
-  // --- Message Handling ---
+  const insertMarkdown = (syntax: string) => {
+    if (!textareaRef.current) return;
+    const start = textareaRef.current.selectionStart;
+    const end = textareaRef.current.selectionEnd;
+    const text = inputValue;
+    const selected = text.substring(start, end);
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+    
+    const newText = `${before}${syntax}${selected}${syntax}${after}`;
+    setInputValue(newText);
+    textareaRef.current.focus();
+    
+    // Reset cursor position inside tags
+    const newCursorPos = start + syntax.length + selected.length + syntax.length;
+    setTimeout(() => {
+        if(textareaRef.current) textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
+  const insertLink = () => {
+    if (!textareaRef.current) return;
+    const start = textareaRef.current.selectionStart;
+    const end = textareaRef.current.selectionEnd;
+    const text = inputValue;
+    const selected = text.substring(start, end);
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+
+    const linkText = selected || 'text';
+    const newText = `${before}[${linkText}](url)${after}`;
+    setInputValue(newText);
+    textareaRef.current.focus();
+    
+    // Highlight "url" part
+    const urlStart = start + 1 + linkText.length + 2;
+    const urlEnd = urlStart + 3;
+    setTimeout(() => {
+         if(textareaRef.current) textareaRef.current.setSelectionRange(urlStart, urlEnd);
+    }, 0);
+  };
+
   const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim() || isLoading || !user) return;
-
+    
+    const currentUserId = user.id;
+    const currentUserName = user.name;
     let targetSessionId = currentSessionId;
     let targetSession = sessions.find(s => s.id === targetSessionId);
-
-    // If no session exists, create one implicitly
     let updatedSessions = [...sessions];
+
     if (!targetSession) {
       const newSession: ChatSession = {
         id: uuidv4(),
-        userId: user.id,
-        title: inputValue.trim().slice(0, 30) + "...", 
+        userId: currentUserId,
+        title: inputValue.trim().slice(0, 30), 
         messages: [],
         updatedAt: Date.now()
       };
@@ -232,7 +301,7 @@ function App() {
     setInputValue("");
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
-    // 1. Add User Message
+    // 1. User Message
     const userMsg: ChatMessage = {
       id: uuidv4(),
       role: Role.USER,
@@ -241,92 +310,107 @@ function App() {
     };
 
     targetSession.messages.push(userMsg);
-    // Update Title if it's the first message
-    if (targetSession.messages.length === 1) {
-        targetSession.title = userText.slice(0, 30);
-    }
     targetSession.updatedAt = Date.now();
     
-    // Move to top of list
+    // Sort and Save
     updatedSessions = updatedSessions.filter(s => s.id !== targetSessionId);
     updatedSessions.unshift(targetSession);
-    
     setSessions([...updatedSessions]);
-    // Save immediate user state
-    saveSessionsToStorage(updatedSessions, user.id);
+    saveSessionsToStorage(updatedSessions, currentUserId);
     
     setIsLoading(true);
 
-    // 2. Add Model Placeholder
-    const modelMsgId = uuidv4();
-    const initialModelMsg: ChatMessage = {
-      id: modelMsgId,
-      role: Role.MODEL,
-      text: "", 
-      timestamp: Date.now()
-    };
-
-    targetSession.messages.push(initialModelMsg);
-    setSessions([...updatedSessions]);
-    
+    // 2. Determine Action based on Model Category
     try {
-      // 3. Stream Response
-      const finalResponseText = await streamGeminiResponse(
-        selectedModel.id,
-        targetSession.messages.slice(0, -1),
-        userText,
-        language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN,
-        (currentFullText) => {
-          setSessions(prevSessions => {
-             const newSessions = [...prevSessions];
-             const sess = newSessions.find(s => s.id === targetSessionId);
-             if (sess) {
-               const msg = sess.messages.find(m => m.id === modelMsgId);
-               if (msg) msg.text = currentFullText;
-             }
-             return newSessions;
-          });
-        }
-      );
+      if (selectedModel.category === 'image') {
+        // --- Image Generation ---
+        const imageUrl = await generateImage(userText, imageSize);
+        const modelMsg: ChatMessage = {
+          id: uuidv4(),
+          role: Role.MODEL,
+          text: language === 'zh' ? `图像生成完毕 (${imageSize})。` : `Image generated successfully (${imageSize}).`,
+          attachment: { type: 'image', url: imageUrl },
+          timestamp: Date.now()
+        };
+        targetSession.messages.push(modelMsg);
 
-      // 4. Save Final State
-      setSessions(prevSessions => {
-        const newSessions = [...prevSessions];
-        const sess = newSessions.find(s => s.id === targetSessionId);
-        if (sess) {
-          const msg = sess.messages.find(m => m.id === modelMsgId);
-          if (msg) {
-            msg.text = finalResponseText; // Ensure exact match
+      } else if (selectedModel.category === 'video') {
+        // --- Video Generation ---
+        const videoUrl = await generateVideo(userText, videoAspectRatio);
+        const modelMsg: ChatMessage = {
+          id: uuidv4(),
+          role: Role.MODEL,
+          text: language === 'zh' ? `视频生成完毕 (${videoAspectRatio})。` : `Video generated successfully (${videoAspectRatio}).`,
+          attachment: { type: 'video', url: videoUrl },
+          timestamp: Date.now()
+        };
+        targetSession.messages.push(modelMsg);
+
+      } else {
+        // --- Standard Text Chat ---
+        const modelMsgId = uuidv4();
+        const initialModelMsg: ChatMessage = {
+          id: modelMsgId,
+          role: Role.MODEL,
+          text: "", 
+          timestamp: Date.now()
+        };
+        targetSession.messages.push(initialModelMsg);
+        setSessions([...updatedSessions]); // Render placeholder
+        
+        const systemInstructionWithMemory = language === 'zh'
+          ? `${SYSTEM_INSTRUCTION_ZH}\n\n当前用户名称: ${currentUserName}。`
+          : `${SYSTEM_INSTRUCTION_EN}\n\nCurrent User Name: ${currentUserName}.`;
+
+        const finalResponseText = await streamGeminiResponse(
+          selectedModel.id,
+          targetSession.messages.slice(0, -1),
+          userText,
+          systemInstructionWithMemory,
+          (currentFullText) => {
+            setSessions(prev => {
+               const news = [...prev];
+               const s = news.find(sess => sess.id === targetSessionId);
+               const m = s?.messages.find(msg => msg.id === modelMsgId);
+               if (m) m.text = currentFullText;
+               return news;
+            });
           }
-          sess.updatedAt = Date.now();
-        }
-        // Persist to local storage
-        saveSessionsToStorage(newSessions, user.id);
-        return newSessions;
-      });
+        );
+        // Ensure final state matches
+        const finalMsg = targetSession.messages.find(m => m.id === modelMsgId);
+        if (finalMsg) finalMsg.text = finalResponseText;
+      }
       
-    } catch (error) {
-      console.error("Failed to generate", error);
-      setSessions(prevSessions => {
-        const newSessions = [...prevSessions];
-        const sess = newSessions.find(s => s.id === targetSessionId);
-        if (sess) {
-          const msg = sess.messages.find(m => m.id === modelMsgId);
-          if (msg) {
-             msg.text = language === 'zh' ? "错误：连接中断，请重试。" : "Error: Connection interrupted. Please try again.";
-             msg.isError = true;
-          }
-        }
-        saveSessionsToStorage(newSessions, user.id);
-        return newSessions;
-     });
+      // Success Save
+      saveSessionsToStorage(updatedSessions, currentUserId);
+
+    } catch (error: any) {
+      console.error("Generation failed", error);
+      const errorMsg: ChatMessage = {
+        id: uuidv4(),
+        role: Role.MODEL,
+        text: language === 'zh' ? `错误：${error.message || "请求失败"}` : `Error: ${error.message || "Request failed"}`,
+        isError: true,
+        timestamp: Date.now()
+      };
+      targetSession.messages.push(errorMsg);
+      setSessions([...updatedSessions]);
+      saveSessionsToStorage(updatedSessions, currentUserId);
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel.id, user, language]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, language, imageSize, videoAspectRatio]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter') {
+      if (e.ctrlKey || e.shiftKey) {
+        // Allow new line (default behavior for Shift+Enter, manual for Ctrl+Enter)
+        if (e.ctrlKey) {
+           setInputValue(prev => prev + "\n");
+        }
+        return; 
+      }
       e.preventDefault();
       handleSendMessage();
     }
@@ -339,6 +423,11 @@ function App() {
   }
 
   const activeMessages = getCurrentMessages();
+
+  // Helper text for input based on model
+  let inputPlaceholder = t.placeholder;
+  if (selectedModel.category === 'image') inputPlaceholder = t.promptPlaceholderImage;
+  if (selectedModel.category === 'video') inputPlaceholder = t.promptPlaceholderVideo;
 
   return (
     <div className="flex h-screen bg-nexus-900 text-slate-200 font-sans overflow-hidden">
@@ -360,6 +449,7 @@ function App() {
         onSelectSession={(id) => { setCurrentSessionId(id); setSidebarOpen(false); }}
         onDeleteSession={deleteSession}
         user={user}
+        onUpdateUserAvatar={updateUserAvatar}
         onLogout={handleLogout}
         language={language}
         onToggleLanguage={toggleLanguage}
@@ -384,6 +474,8 @@ function App() {
                 onClick={() => setModelMenuOpen(!modelMenuOpen)}
                 className="flex items-center gap-2 px-3 py-1.5 hover:bg-nexus-800 rounded-lg transition-colors text-sm font-medium"
               >
+                {selectedModel.category === 'image' && <ImageIcon />}
+                {selectedModel.category === 'video' && <VideoIcon />}
                 <span className={selectedModel.isPro ? "text-purple-400" : "text-nexus-accent"}>
                   {selectedModel.name}
                 </span>
@@ -391,7 +483,7 @@ function App() {
               </button>
 
               {modelMenuOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 bg-nexus-800 border border-nexus-700 rounded-xl shadow-2xl p-2 z-50">
+                <div className="absolute top-full left-0 mt-2 w-80 bg-nexus-800 border border-nexus-700 rounded-xl shadow-2xl p-2 z-50 max-h-[80vh] overflow-y-auto">
                   {GEMINI_MODELS.map(model => (
                     <button
                       key={model.id}
@@ -401,10 +493,14 @@ function App() {
                       }}
                       className={`w-full text-left px-4 py-3 rounded-lg text-sm mb-1 transition-colors ${selectedModel.id === model.id ? 'bg-nexus-700' : 'hover:bg-nexus-700/50'}`}
                     >
-                      <div className={`font-semibold ${model.isPro ? 'text-purple-400' : 'text-nexus-accent'}`}>
-                        {model.name}
+                      <div className="flex items-center gap-2">
+                        {model.category === 'image' && <ImageIcon />}
+                        {model.category === 'video' && <VideoIcon />}
+                        <span className={`font-semibold ${model.isPro ? 'text-purple-400' : 'text-nexus-accent'}`}>
+                           {model.name}
+                        </span>
                       </div>
-                      <div className="text-xs text-gray-400 mt-1">
+                      <div className="text-xs text-gray-400 mt-1 leading-relaxed">
                         {model.description}
                       </div>
                     </button>
@@ -422,7 +518,9 @@ function App() {
                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                  </span>
-                 <span className="text-[10px] font-mono text-amber-500 tracking-wider">{t.processing}</span>
+                 <span className="text-[10px] font-mono text-amber-500 tracking-wider">
+                   {selectedModel.category === 'video' ? t.generatingVideo : t.processing}
+                 </span>
                </>
              ) : (
                <>
@@ -441,14 +539,17 @@ function App() {
               <div className="flex-1 flex flex-col items-center justify-center opacity-40 select-none">
                 <div className="w-20 h-20 bg-gradient-to-tr from-nexus-accent to-purple-600 rounded-2xl mb-6 shadow-[0_0_30px_rgba(59,130,246,0.3)] animate-pulse-slow"></div>
                 <h1 className="text-3xl font-bold mb-2 text-white">{t.welcomeTitle}</h1>
-                <p className="text-nexus-accent">{t.welcomeSubtitle}</p>
+                <p className="text-nexus-accent text-center">{t.welcomeSubtitle}</p>
+                <div className="mt-8 grid grid-cols-2 gap-4 max-w-md">
+                   <div className="bg-nexus-800 p-3 rounded text-xs text-gray-400 text-center">Alt + N <br/> New Chat</div>
+                   <div className="bg-nexus-800 p-3 rounded text-xs text-gray-400 text-center">Ctrl + Enter <br/> New Line</div>
+                </div>
               </div>
             ) : (
               <div className="space-y-6 pb-4">
                 {activeMessages.map((msg) => (
                   <MessageBubble key={msg.id} message={msg} />
                 ))}
-                {/* Invisible element to scroll to */}
                 <div ref={messagesEndRef} />
               </div>
             )}
@@ -458,14 +559,57 @@ function App() {
         {/* Input Area */}
         <div className="p-4 bg-nexus-900 border-t border-nexus-700">
           <div className="max-w-3xl mx-auto relative">
+            
+            {/* Toolbar (Markdown + Media Config) */}
+            <div className="flex items-center justify-between mb-2 px-1">
+              
+              {/* Left: Markdown Tools */}
+              <div className="flex items-center gap-1">
+                <button onClick={() => insertMarkdown('**')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Bold"><BoldIcon /></button>
+                <button onClick={() => insertMarkdown('_')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Italic"><ItalicIcon /></button>
+                <button onClick={() => insertMarkdown('`')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Code"><CodeIcon /></button>
+                <button onClick={insertLink} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Link"><LinkIcon /></button>
+              </div>
+
+              {/* Right: Model Specific Options */}
+              {selectedModel.category === 'image' && (
+                <div className="flex items-center gap-1 bg-nexus-800 rounded-lg p-0.5 border border-nexus-700">
+                   {["1K", "2K", "4K"].map(size => (
+                      <button
+                        key={size}
+                        onClick={() => setImageSize(size)}
+                        className={`text-[10px] px-2 py-1 rounded-md transition-all ${imageSize === size ? 'bg-nexus-700 text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}
+                      >
+                        {size}
+                      </button>
+                   ))}
+                </div>
+              )}
+
+              {selectedModel.category === 'video' && (
+                <div className="flex items-center gap-1 bg-nexus-800 rounded-lg p-0.5 border border-nexus-700">
+                   {["16:9", "9:16"].map(ratio => (
+                      <button
+                        key={ratio}
+                        onClick={() => setVideoAspectRatio(ratio)}
+                        className={`text-[10px] px-2 py-1 rounded-md transition-all ${videoAspectRatio === ratio ? 'bg-nexus-700 text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}
+                      >
+                        {ratio}
+                      </button>
+                   ))}
+                </div>
+              )}
+
+            </div>
+
             <textarea
               ref={textareaRef}
               rows={1}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={t.placeholder}
-              className="w-full bg-nexus-800 text-white placeholder-gray-500 border border-nexus-700 rounded-2xl pl-5 pr-14 py-4 focus:outline-none focus:border-nexus-accent focus:ring-1 focus:ring-nexus-accent resize-none overflow-hidden transition-all shadow-sm text-base"
+              placeholder={inputPlaceholder}
+              className="w-full bg-nexus-800 text-white placeholder-gray-500 border border-nexus-700 rounded-2xl pl-5 pr-14 py-4 focus:outline-none focus:border-nexus-accent focus:ring-1 focus:ring-nexus-accent resize-none overflow-hidden transition-all shadow-sm text-base font-sans"
             />
             
             <button
@@ -484,7 +628,7 @@ function App() {
           <div className="text-center mt-2 flex justify-center items-center gap-2">
             <ActivityIcon />
             <span className="text-[10px] text-gray-600 font-mono">
-              Nexus Core v2.0 • {selectedModel.id} • {language.toUpperCase()}
+              Nexus Core v2.1 • {selectedModel.name}
             </span>
           </div>
         </div>

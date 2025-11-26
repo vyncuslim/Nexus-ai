@@ -4,13 +4,29 @@ export const GEMINI_MODELS: ModelConfig[] = [
   {
     id: 'gemini-2.5-flash',
     name: 'Nexus Flash',
-    description: 'High speed / 高速响应',
+    description: 'Fast & Efficient. Daily tasks. / 极速响应。日常助手。',
+    category: 'text',
     isPro: false
   },
   {
     id: 'gemini-3-pro-preview',
     name: 'Nexus Pro',
-    description: 'High intelligence / 深度推理',
+    description: 'Reasoning & Coding. Complex logic. / 深度推理与编程。复杂任务。',
+    category: 'text',
+    isPro: true
+  },
+  {
+    id: 'gemini-3-pro-image-preview',
+    name: 'Nexus Vision',
+    description: 'High-fidelity Image Generation. / 高保真图像生成 (Nano Banana Pro)。',
+    category: 'image',
+    isPro: true
+  },
+  {
+    id: 'veo-3.1-fast-generate-preview',
+    name: 'Nexus Veo',
+    description: 'Video Generation. / 视频生成 (Veo)。',
+    category: 'video',
     isPro: true
   }
 ];
@@ -36,6 +52,7 @@ export const UI_TEXT = {
     connectBtn: "Initialize Connection",
     createBtn: "Create Neural Link",
     processing: "PROCESSING",
+    generatingVideo: "RENDERING VIDEO STREAM...",
     ready: "SYSTEM READY",
     language: "Language / 语言",
     logout: "Terminate Session",
@@ -52,6 +69,13 @@ export const UI_TEXT = {
     authErrorUserNotFound: "Identity not found. Please register.",
     authErrorUserExists: "Identity already registered. Please sign in.",
     authErrorGeneric: "Authentication failed.",
+    uploadPhoto: "Upload Photo",
+    takePhoto: "Take Photo",
+    cancel: "Cancel",
+    save: "Save",
+    profile: "User Profile",
+    promptPlaceholderImage: "Describe the image to generate...",
+    promptPlaceholderVideo: "Describe the video to generate...",
   },
   zh: {
     newChat: "新建会话",
@@ -64,6 +88,7 @@ export const UI_TEXT = {
     connectBtn: "初始化连接",
     createBtn: "建立神经链接",
     processing: "核心运算中",
+    generatingVideo: "视频流渲染中...",
     ready: "系统就绪",
     language: "语言 / Language",
     logout: "断开连接",
@@ -80,5 +105,12 @@ export const UI_TEXT = {
     authErrorUserNotFound: "未找到该身份，请先注册。",
     authErrorUserExists: "该身份已存在，请直接登录。",
     authErrorGeneric: "验证失败。",
+    uploadPhoto: "上传照片",
+    takePhoto: "拍摄照片",
+    cancel: "取消",
+    save: "保存",
+    profile: "用户档案",
+    promptPlaceholderImage: "描述您想生成的图像...",
+    promptPlaceholderVideo: "描述您想生成的视频...",
   }
 };

@@ -10,29 +10,62 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const isUser = message.role === Role.USER;
   const isError = message.isError;
 
-  // Basic formatting for code blocks and bold text (lightweight solution)
+  // Basic formatting for code blocks, bold text, and links
   const formatText = (text: string) => {
-    const parts = text.split(/(```[\s\S]*?```)/g);
-    return parts.map((part, index) => {
-      if (part.startsWith('```') && part.endsWith('```')) {
-        const content = part.slice(3, -3).replace(/^[a-z]+\n/, ''); // Strip lang identifier roughly
-        return (
-          <pre key={index} className="bg-nexus-900 p-3 rounded-md overflow-x-auto my-2 border border-nexus-700">
-            <code className="text-sm font-mono text-gray-300">{content}</code>
-          </pre>
-        );
-      }
-      return <span key={index} className="whitespace-pre-wrap leading-relaxed">{part}</span>;
-    });
+    // Regex matches:
+    // 1. Code blocks: ```...```
+    // 2. Links: [text](url)
+    // 3. Bold: **text**
+    // 4. Inline code: `text`
+    const parts = text.split(/(```[\s\S]*?```|\[.*?\]\(.*?\)|https?:\/\/[^\s]+|\*\*(.*?)\*\*|`(.*?)`)/g);
+    
+    return (
+        <span className="whitespace-pre-wrap leading-relaxed break-words">
+            {parts.map((part, i) => {
+                if (!part) return null;
+
+                // Code Block
+                if (part.startsWith('```') && part.endsWith('```')) {
+                    const content = part.slice(3, -3);
+                    return <code key={i} className="block bg-nexus-900/50 p-2 rounded text-xs font-mono my-2 overflow-x-auto">{content}</code>;
+                }
+                
+                // Link: [text](url)
+                if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
+                    const match = part.match(/\[(.*?)\]\((.*?)\)/);
+                    if (match) {
+                        return <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-nexus-accent hover:underline">{match[1]}</a>;
+                    }
+                }
+
+                // Raw URL
+                if (part.match(/^https?:\/\//)) {
+                    return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-nexus-accent hover:underline">{part}</a>;
+                }
+
+                // Bold
+                if (part.startsWith('**') && part.endsWith('**')) {
+                    return <strong key={i}>{part.slice(2, -2)}</strong>;
+                }
+
+                // Inline Code
+                if (part.startsWith('`') && part.endsWith('`')) {
+                    return <code key={i} className="bg-nexus-900/50 px-1 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
+                }
+
+                return <span key={i}>{part}</span>;
+            })}
+        </span>
+    );
   };
 
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-6 group`}>
-      <div className={`flex max-w-[85%] md:max-w-[75%] gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+      <div className={`flex max-w-[90%] md:max-w-[80%] gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
         
         {/* Avatar */}
         <div className={`
-          flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
+          flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden
           ${isUser ? 'bg-nexus-accent' : isError ? 'bg-red-600' : 'bg-emerald-600'}
           shadow-lg
         `}>
@@ -57,6 +90,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           <div className="text-sm md:text-base">
             {formatText(message.text)}
           </div>
+
+          {/* Attachments */}
+          {message.attachment && (
+            <div className="mt-3 rounded-lg overflow-hidden border border-nexus-700 shadow-md">
+              {message.attachment.type === 'image' && (
+                <img src={message.attachment.url} alt="Generated content" className="w-full h-auto max-h-96 object-contain bg-black/50" />
+              )}
+              {message.attachment.type === 'video' && (
+                <video controls src={message.attachment.url} className="w-full max-h-96 bg-black/50" />
+              )}
+            </div>
+          )}
 
           {/* Timestamp (Hidden by default, shown on hover) */}
           <div className="absolute -bottom-5 left-0 w-full text-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-gray-500">

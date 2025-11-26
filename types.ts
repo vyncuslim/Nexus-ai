@@ -3,18 +3,28 @@ export enum Role {
   MODEL = 'model'
 }
 
+export interface Attachment {
+  type: 'image' | 'video';
+  url: string;
+  mimeType?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: Role;
   text: string;
+  attachment?: Attachment;
   isError?: boolean;
   timestamp: number;
 }
+
+export type ModelCategory = 'text' | 'image' | 'video';
 
 export interface ModelConfig {
   id: string;
   name: string;
   description: string;
+  category: ModelCategory;
   isPro?: boolean;
 }
 
@@ -32,4 +42,5 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  avatar?: string; // Base64 string
 }

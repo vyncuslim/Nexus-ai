@@ -101,7 +101,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, language }) => {
               
               <div>
                 <input 
-                  type="text" 
+                  type="email" 
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-nexus-900/80 border border-nexus-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-nexus-accent focus:ring-1 focus:ring-nexus-accent transition-all font-mono placeholder-gray-600 text-sm"
