@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
 import AuthScreen from './components/AuthScreen';
-import { SendIcon, MenuIcon, ChevronDownIcon, ActivityIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon } from './components/Icon';
+import { SendIcon, MenuIcon, ChevronDownIcon, ActivityIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon, UndoIcon, RedoIcon } from './components/Icon';
 import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, UI_TEXT } from './constants';
 import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, Attachment } from './types';
 import { streamGeminiResponse, generateImage, generateVideo } from './services/geminiService';
+import { useHistory } from './hooks/useHistory';
 import { v4 as uuidv4 } from 'uuid';
 
 function App() {
@@ -19,9 +20,21 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [language, setLanguage] = useState<Language>('en');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  
+  // Undo/Redo History for Sessions
+  const sessionsControl = useHistory<ChatSession[]>([]);
+  const sessions = sessionsControl.state;
+  const setSessions = sessionsControl.set;
+
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [inputValue, setInputValue] = useState("");
+  
+  // Undo/Redo History for Input
+  const inputControl = useHistory<string>("");
+  const inputValue = inputControl.state;
+  // Custom setter for debounced history saving? For now, we save on blur or pause, or just simple set.
+  // To avoid history spam, we can just use it directly, assuming user wants granular undo.
+  const setInputValue = inputControl.set;
+
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelConfig>(GEMINI_MODELS[0]);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
@@ -32,6 +45,7 @@ function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- Load Initial State ---
   useEffect(() => {
@@ -88,17 +102,18 @@ function App() {
         const s: ChatSession[] = JSON.parse(storedSessions);
         // Sort by updated at desc
         s.sort((a, b) => b.updatedAt - a.updatedAt);
-        setSessions(s);
+        // We use skipHistory=true for initial load
+        setSessions(s, true);
         // If sessions exist, open the most recent
         if (s.length > 0) {
           setCurrentSessionId(s[0].id);
         }
       } catch (e) {
         console.error("Failed to load sessions", e);
-        setSessions([]);
+        setSessions([], true);
       }
     } else {
-      setSessions([]);
+      setSessions([], true);
     }
   };
 
@@ -199,7 +214,7 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
-    setSessions([]);
+    setSessions([], true);
     setCurrentSessionId(null);
     localStorage.removeItem(STORAGE_KEY_USER);
     setSidebarOpen(false);
@@ -232,46 +247,47 @@ function App() {
     }
   }, [inputValue]);
 
-  const insertMarkdown = (syntax: string) => {
+  // --- Markdown & Input Handling ---
+  
+  // Generic wrapper function that handles selection
+  const wrapSelection = (prefix: string, suffix: string, defaultText: string = "text") => {
     if (!textareaRef.current) return;
+    
     const start = textareaRef.current.selectionStart;
     const end = textareaRef.current.selectionEnd;
     const text = inputValue;
-    const selected = text.substring(start, end);
+    
+    // Check if something is selected
+    const hasSelection = start !== end;
+    const selected = hasSelection ? text.substring(start, end) : defaultText;
+    
     const before = text.substring(0, start);
     const after = text.substring(end);
     
-    const newText = `${before}${syntax}${selected}${syntax}${after}`;
+    const newText = `${before}${prefix}${selected}${suffix}${after}`;
     setInputValue(newText);
     textareaRef.current.focus();
     
-    // Reset cursor position inside tags
-    const newCursorPos = start + syntax.length + selected.length + syntax.length;
+    // Set cursor position
     setTimeout(() => {
-        if(textareaRef.current) textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+        if(!textareaRef.current) return;
+        if (hasSelection) {
+            // If text was selected, select the wrapped text
+            textareaRef.current.setSelectionRange(start, start + prefix.length + selected.length + suffix.length);
+        } else {
+            // If no text was selected, place cursor between tags (or at end of default)
+            const cursor = start + prefix.length + selected.length;
+            textareaRef.current.setSelectionRange(cursor, cursor);
+        }
     }, 0);
   };
 
-  const insertLink = () => {
-    if (!textareaRef.current) return;
-    const start = textareaRef.current.selectionStart;
-    const end = textareaRef.current.selectionEnd;
-    const text = inputValue;
-    const selected = text.substring(start, end);
-    const before = text.substring(0, start);
-    const after = text.substring(end);
-
-    const linkText = selected || 'text';
-    const newText = `${before}[${linkText}](url)${after}`;
-    setInputValue(newText);
-    textareaRef.current.focus();
-    
-    // Highlight "url" part
-    const urlStart = start + 1 + linkText.length + 2;
-    const urlEnd = urlStart + 3;
-    setTimeout(() => {
-         if(textareaRef.current) textareaRef.current.setSelectionRange(urlStart, urlEnd);
-    }, 0);
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    // We simple set it. The useHistory hook tracks every change. 
+    // For a production app, we might want to debounce history commits, but for "Undo/Redo" feature demo, 
+    // granular is often expected or acceptable.
+    setInputValue(val);
   };
 
   const handleSendMessage = useCallback(async () => {
@@ -298,7 +314,10 @@ function App() {
     }
 
     const userText = inputValue.trim();
-    setInputValue("");
+    // Clear input and reset its history for the new message? 
+    // Usually input history is preserved, but clearing it makes sense.
+    // We'll just set it to empty.
+    setInputValue(""); 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
     // 1. User Message
@@ -368,13 +387,13 @@ function App() {
           userText,
           systemInstructionWithMemory,
           (currentFullText) => {
-            setSessions(prev => {
+            setSessions((prev) => {
                const news = [...prev];
                const s = news.find(sess => sess.id === targetSessionId);
                const m = s?.messages.find(msg => msg.id === modelMsgId);
                if (m) m.text = currentFullText;
                return news;
-            });
+            }, true); // Skip history for streaming updates to avoid pollution
           }
         );
         // Ensure final state matches
@@ -400,12 +419,11 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, language, imageSize, videoAspectRatio]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, language, imageSize, videoAspectRatio, setSessions, setInputValue]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       if (e.ctrlKey || e.shiftKey) {
-        // Allow new line (default behavior for Shift+Enter, manual for Ctrl+Enter)
         if (e.ctrlKey) {
            setInputValue(prev => prev + "\n");
         }
@@ -510,24 +528,46 @@ function App() {
             </div>
           </div>
 
-          {/* Status Indicator */}
-          <div className="flex items-center gap-2 px-3 py-1 bg-nexus-800 rounded-full border border-nexus-700">
-             {isLoading ? (
-               <>
-                 <span className="relative flex h-2 w-2">
-                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                   <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                 </span>
-                 <span className="text-[10px] font-mono text-amber-500 tracking-wider">
-                   {selectedModel.category === 'video' ? t.generatingVideo : t.processing}
-                 </span>
-               </>
-             ) : (
-               <>
-                 <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                 <span className="text-[10px] font-mono text-emerald-500 tracking-wider">{t.ready}</span>
-               </>
-             )}
+          <div className="flex items-center gap-4">
+             {/* Session Undo Controls (Hidden on small screens if strict space, but fine here) */}
+             <div className="hidden md:flex gap-1">
+                <button 
+                  onClick={sessionsControl.undo} 
+                  disabled={!sessionsControl.canUndo}
+                  className={`p-1.5 rounded transition-colors ${sessionsControl.canUndo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}
+                  title="Undo Session Change"
+                >
+                  <UndoIcon />
+                </button>
+                <button 
+                  onClick={sessionsControl.redo} 
+                  disabled={!sessionsControl.canRedo}
+                  className={`p-1.5 rounded transition-colors ${sessionsControl.canRedo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}
+                  title="Redo Session Change"
+                >
+                  <RedoIcon />
+                </button>
+             </div>
+
+            {/* Status Indicator */}
+            <div className="flex items-center gap-2 px-3 py-1 bg-nexus-800 rounded-full border border-nexus-700">
+              {isLoading ? (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  </span>
+                  <span className="text-[10px] font-mono text-amber-500 tracking-wider">
+                    {selectedModel.category === 'video' ? t.generatingVideo : t.processing}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                  <span className="text-[10px] font-mono text-emerald-500 tracking-wider">{t.ready}</span>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -563,12 +603,32 @@ function App() {
             {/* Toolbar (Markdown + Media Config) */}
             <div className="flex items-center justify-between mb-2 px-1">
               
-              {/* Left: Markdown Tools */}
+              {/* Left: Markdown Tools & Undo/Redo */}
               <div className="flex items-center gap-1">
-                <button onClick={() => insertMarkdown('**')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Bold"><BoldIcon /></button>
-                <button onClick={() => insertMarkdown('_')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Italic"><ItalicIcon /></button>
-                <button onClick={() => insertMarkdown('`')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Code"><CodeIcon /></button>
-                <button onClick={insertLink} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Link"><LinkIcon /></button>
+                <button onClick={() => wrapSelection('**', '**', 'bold text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Bold"><BoldIcon /></button>
+                <button onClick={() => wrapSelection('_', '_', 'italic text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Italic"><ItalicIcon /></button>
+                <button onClick={() => wrapSelection('`', '`', 'code')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Inline Code"><CodeIcon /></button>
+                <button onClick={() => wrapSelection('```\n', '\n```', 'code block')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Code Block">
+                   <div className="scale-75"><CodeIcon /></div>
+                </button>
+                <button onClick={() => wrapSelection('[', '](url)', 'link text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Link"><LinkIcon /></button>
+                
+                <div className="w-px h-4 bg-nexus-700 mx-2"></div>
+                
+                <button 
+                   onClick={inputControl.undo} 
+                   disabled={!inputControl.canUndo}
+                   className={`p-1.5 rounded transition-colors ${inputControl.canUndo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}
+                >
+                   <UndoIcon />
+                </button>
+                <button 
+                   onClick={inputControl.redo} 
+                   disabled={!inputControl.canRedo}
+                   className={`p-1.5 rounded transition-colors ${inputControl.canRedo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}
+                >
+                   <RedoIcon />
+                </button>
               </div>
 
               {/* Right: Model Specific Options */}
@@ -606,7 +666,7 @@ function App() {
               ref={textareaRef}
               rows={1}
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder={inputPlaceholder}
               className="w-full bg-nexus-800 text-white placeholder-gray-500 border border-nexus-700 rounded-2xl pl-5 pr-14 py-4 focus:outline-none focus:border-nexus-accent focus:ring-1 focus:ring-nexus-accent resize-none overflow-hidden transition-all shadow-sm text-base font-sans"

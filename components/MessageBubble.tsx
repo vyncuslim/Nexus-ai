@@ -1,10 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ChatMessage, Role } from '../types';
-import { RobotIcon, UserIcon } from './Icon';
+import { RobotIcon, UserIcon, CopyIcon, CheckIcon } from './Icon';
 
 interface MessageBubbleProps {
   message: ChatMessage;
 }
+
+const CodeBlock = ({ content }: { content: string }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative group my-2">
+      <div className="absolute right-2 top-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={handleCopy}
+          className="p-1.5 bg-nexus-800 text-gray-400 hover:text-white rounded-md border border-nexus-700 shadow-sm"
+          title="Copy code"
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </button>
+      </div>
+      <code className="block bg-nexus-900/60 p-3 rounded-lg text-xs font-mono overflow-x-auto border border-nexus-700/50">
+        {content}
+      </code>
+    </div>
+  );
+};
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const isUser = message.role === Role.USER;
@@ -27,7 +54,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                 // Code Block
                 if (part.startsWith('```') && part.endsWith('```')) {
                     const content = part.slice(3, -3);
-                    return <code key={i} className="block bg-nexus-900/50 p-2 rounded text-xs font-mono my-2 overflow-x-auto">{content}</code>;
+                    return <CodeBlock key={i} content={content} />;
                 }
                 
                 // Link: [text](url)
@@ -50,7 +77,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
                 // Inline Code
                 if (part.startsWith('`') && part.endsWith('`')) {
-                    return <code key={i} className="bg-nexus-900/50 px-1 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
+                    return <code key={i} className="bg-nexus-900/50 px-1.5 py-0.5 rounded text-xs font-mono text-nexus-accent/80 border border-nexus-700/30">{part.slice(1, -1)}</code>;
                 }
 
                 return <span key={i}>{part}</span>;

@@ -4,28 +4,28 @@ export const GEMINI_MODELS: ModelConfig[] = [
   {
     id: 'gemini-2.5-flash',
     name: 'Nexus Flash',
-    description: 'Fast & Efficient. Daily tasks. / 极速响应。日常助手。',
+    description: 'Fast. Best for everyday tasks.',
     category: 'text',
     isPro: false
   },
   {
     id: 'gemini-3-pro-preview',
     name: 'Nexus Pro',
-    description: 'Reasoning & Coding. Complex logic. / 深度推理与编程。复杂任务。',
+    description: 'Smart. Best for coding & complex logic.',
     category: 'text',
     isPro: true
   },
   {
     id: 'gemini-3-pro-image-preview',
     name: 'Nexus Vision',
-    description: 'High-fidelity Image Generation. / 高保真图像生成 (Nano Banana Pro)。',
+    description: 'Create high-quality images.',
     category: 'image',
     isPro: true
   },
   {
     id: 'veo-3.1-fast-generate-preview',
     name: 'Nexus Veo',
-    description: 'Video Generation. / 视频生成 (Veo)。',
+    description: 'Create short videos.',
     category: 'video',
     isPro: true
   }
