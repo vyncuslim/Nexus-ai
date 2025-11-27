@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { PlusIcon, GlobeIcon, LogOutIcon, TrashIcon, CameraIcon, UploadIcon, UserIcon } from './Icon';
+import { PlusIcon, GlobeIcon, LogOutIcon, TrashIcon, CameraIcon, UploadIcon, UserIcon, MailIcon, HelpIcon } from './Icon';
 import { ChatSession, User, Language } from '../types';
-import { UI_TEXT } from '../constants';
+import { UI_TEXT, CONTACT_EMAIL, USER_GUIDE } from '../constants';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -32,6 +32,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const t = UI_TEXT[language];
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
 
@@ -230,8 +231,27 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {/* Bottom Controls */}
-          <div className="p-4 bg-nexus-900 border-t border-nexus-700 space-y-3">
+          <div className="p-4 bg-nexus-900 border-t border-nexus-700 space-y-2">
             
+            {/* Action Buttons Row */}
+            <div className="flex gap-2 mb-2">
+              <a 
+                href={`mailto:${CONTACT_EMAIL}`}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-nexus-800 hover:bg-nexus-700 text-gray-400 hover:text-white rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-nexus-600"
+                title={CONTACT_EMAIL}
+              >
+                <MailIcon />
+                {t.feedback}
+              </a>
+              <button 
+                onClick={() => setShowHelpModal(true)}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-nexus-800 hover:bg-nexus-700 text-gray-400 hover:text-white rounded-lg transition-colors text-xs font-medium border border-transparent hover:border-nexus-600"
+              >
+                <HelpIcon />
+                {t.userGuide}
+              </button>
+            </div>
+
             {/* Language Toggle */}
             <button 
               onClick={onToggleLanguage}
@@ -329,6 +349,41 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* User Guide Modal */}
+      {showHelpModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+           <div className="bg-nexus-900 border border-nexus-700 rounded-2xl w-full max-w-2xl shadow-2xl relative flex flex-col max-h-[80vh]">
+             <div className="p-6 border-b border-nexus-700 flex justify-between items-center bg-nexus-800/50 rounded-t-2xl">
+               <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                 <HelpIcon /> {t.userGuide}
+               </h2>
+               <button 
+                 onClick={() => setShowHelpModal(false)}
+                 className="text-gray-500 hover:text-white"
+               >
+                 ✕
+               </button>
+             </div>
+             
+             <div className="p-6 overflow-y-auto custom-scrollbar text-sm md:text-base space-y-6">
+               {USER_GUIDE[language].map((item, index) => (
+                 <div key={index} className="bg-nexus-800/30 p-4 rounded-xl border border-nexus-700/50">
+                   <h3 className="text-emerald-400 font-bold mb-2 text-lg">{item.title}</h3>
+                   <p className="text-gray-300 leading-relaxed">{item.content}</p>
+                 </div>
+               ))}
+               
+               <div className="mt-8 pt-4 border-t border-nexus-700 text-center">
+                 <p className="text-gray-400 text-sm mb-2">{t.contactUs}</p>
+                 <a href={`mailto:${CONTACT_EMAIL}`} className="text-nexus-accent hover:text-white font-mono text-lg font-bold">
+                   {CONTACT_EMAIL}
+                 </a>
+               </div>
+             </div>
+           </div>
         </div>
       )}
     </>

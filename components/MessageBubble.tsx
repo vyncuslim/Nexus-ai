@@ -18,19 +18,19 @@ const CodeBlock: React.FC<{ content: string }> = ({ content }) => {
   };
 
   return (
-    <div className="relative group my-2">
-      <div className="absolute right-2 top-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+    <div className="relative group my-3">
+      <div className="absolute right-2 top-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <button
           onClick={handleCopy}
-          className="p-1.5 bg-nexus-800 text-gray-400 hover:text-white rounded-md border border-nexus-700 shadow-sm"
+          className="p-1.5 bg-nexus-800 text-gray-400 hover:text-emerald-400 hover:bg-nexus-700 rounded-lg border border-nexus-700 shadow-lg backdrop-blur-sm transition-all"
           title="Copy code"
         >
           {copied ? <CheckIcon /> : <CopyIcon />}
         </button>
       </div>
-      <code className="block bg-nexus-900/60 p-3 rounded-lg text-xs font-mono overflow-x-auto border border-nexus-700/50">
-        {content}
-      </code>
+      <pre className="block bg-nexus-950/50 p-4 rounded-xl text-xs sm:text-sm font-mono overflow-x-auto border border-nexus-700/50 shadow-inner custom-scrollbar">
+        <code>{content}</code>
+      </pre>
     </div>
   );
 };
@@ -100,8 +100,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
                 // Code Block
                 if (part.startsWith('```') && part.endsWith('```')) {
-                    const content = part.slice(3, -3);
-                    return <CodeBlock key={i} content={content} />;
+                    let content = part.slice(3, -3);
+                    // Attempt to strip language identifier (e.g. "javascript\n")
+                    // If the first line is a single word (no spaces), remove it
+                    content = content.replace(/^[a-zA-Z0-9+#]+\n/, ''); 
+                    return <CodeBlock key={i} content={content.trim()} />;
                 }
                 
                 // Link: [text](url)

@@ -75,6 +75,8 @@ export const SYSTEM_INSTRUCTION_EN = `You are Nexus, a helpful AI assistant. Use
 
 export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus，一个有用的人工智能助手。请使用 Markdown 格式化代码。`;
 
+export const CONTACT_EMAIL = "nexusaicontact@gmail.com";
+
 export const UI_TEXT = {
   en: {
     newChat: "New Chat",
@@ -117,7 +119,10 @@ export const UI_TEXT = {
     confirmClear: "Clear this conversation?",
     ttsError: "TTS failed.",
     optional: "(Optional)",
-    keysHelp: "Enter at least one API key to proceed."
+    keysHelp: "Enter at least one API key to proceed.",
+    feedback: "Feedback",
+    userGuide: "User Guide",
+    contactUs: "Contact Us"
   },
   zh: {
     newChat: "新建会话",
@@ -160,6 +165,56 @@ export const UI_TEXT = {
     confirmClear: "确定清空当前会话？",
     ttsError: "语音失败。",
     optional: "(选填)",
-    keysHelp: "请至少输入一个 API 密钥以继续。"
+    keysHelp: "请至少输入一个 API 密钥以继续。",
+    feedback: "反馈建议",
+    userGuide: "使用说明",
+    contactUs: "联系我们"
   }
+};
+
+export const USER_GUIDE = {
+  en: [
+    {
+      title: "1. Dual AI Engine",
+      content: "Nexus integrates both OpenAI (GPT-3.5, GPT-4o, DALL-E 3) and Google Gemini (Flash, Pro, Veo). Use the dropdown at the top to switch providers instantly."
+    },
+    {
+      title: "2. Media Generation",
+      content: "Select 'DALL-E 3' or 'Gemini 3 Image' to generate images. Select 'Veo Video' to generate short videos. Describe what you want to see in the chat box."
+    },
+    {
+      title: "3. Smart Tools",
+      content: "Use the toolbar above the input to format text (Bold, Italic, Code). Use the 'Undo/Redo' buttons to correct your input history."
+    },
+    {
+      title: "4. Audio & Speech",
+      content: "Click the 'Speaker' icon on any AI message to read it aloud using high-quality Text-to-Speech."
+    },
+    {
+      title: "5. Shortcuts",
+      content: "Alt + N: New Chat | Enter: Send | Shift + Enter: New Line."
+    }
+  ],
+  zh: [
+    {
+      title: "1. 双核 AI 引擎",
+      content: "Nexus 集成了 OpenAI (GPT-3.5, GPT-4o, DALL-E 3) 和 Google Gemini (Flash, Pro, Veo)。点击顶部菜单即可在不同模型间无缝切换。"
+    },
+    {
+      title: "2. 媒体生成",
+      content: "选择 'DALL-E 3' 或 'Gemini 3 Image' 生成图像。选择 'Veo Video' 生成短视频。只需在输入框描述您想看到的画面。"
+    },
+    {
+      title: "3. 智能工具栏",
+      content: "使用输入框上方的工具栏格式化文本（加粗、斜体、代码块）。使用 '撤销/重做' 按钮管理您的输入历史。"
+    },
+    {
+      title: "4. 语音朗读",
+      content: "点击 AI 回复气泡上的 '喇叭' 图标，即可使用高质量语音朗读内容。"
+    },
+    {
+      title: "5. 快捷键",
+      content: "Alt + N: 新建会话 | Enter: 发送 | Shift + Enter: 换行"
+    }
+  ]
 };
