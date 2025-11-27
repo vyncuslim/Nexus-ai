@@ -680,7 +680,7 @@ function App() {
                 <button onClick={() => wrapSelection('**', '**', 'bold text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Bold"><BoldIcon /></button>
                 <button onClick={() => wrapSelection('_', '_', 'italic text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Italic"><ItalicIcon /></button>
                 <button onClick={() => wrapSelection('`', '`', 'code')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Inline Code"><CodeIcon /></button>
-                <button onClick={() => wrapSelection('```\n', '\n```', 'code block')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Code Block"><CodeBlockIcon /></button>
+                <button onClick={() => wrapSelection('```\n', '\n```', 'code block')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Insert Code Block"><CodeBlockIcon /></button>
                 <button onClick={() => wrapSelection('[', '](url)', 'link text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Link"><LinkIcon /></button>
                 <div className="w-px h-4 bg-nexus-700 mx-2"></div>
                 <button onClick={inputControl.undo} disabled={!inputControl.canUndo} className={`p-1.5 rounded transition-colors ${inputControl.canUndo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`} title="Undo"><UndoIcon /></button>

@@ -12,9 +12,14 @@ const CodeBlock: React.FC<{ content: string }> = ({ content }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(content).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+      });
+    }
   };
 
   return (
@@ -89,9 +94,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     // Regex matches:
     // 1. Code blocks: ```...```
     // 2. Links: [text](url)
-    // 3. Bold: **text**
-    // 4. Inline code: `text`
-    const parts = text.split(/(```[\s\S]*?```|\[.*?\]\(.*?\)|https?:\/\/[^\s]+|\*\*(.*?)\*\*|`(.*?)`)/g);
+    // 3. Raw URLs: http...
+    // 4. Bold: **text**
+    // 5. Inline code: `text`
+    // Fixed Regex: Removed inner capturing groups to avoid duplication in split result
+    const parts = text.split(/(```[\s\S]*?```|\[.*?\]\(.*?\)|https?:\/\/[^\s]+|\*\*.*?\*\*|`.*?`)/g);
     
     return (
         <span className="whitespace-pre-wrap leading-relaxed break-words">
