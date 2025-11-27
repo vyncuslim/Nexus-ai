@@ -1,4 +1,4 @@
-import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, Chat, GenerateContentResponse, Modality } from "@google/genai";
 import { ChatMessage, Role } from "../types";
 
 // Initialize the client strictly using the environment variable as per guidelines
@@ -122,4 +122,29 @@ export const generateVideo = async (prompt: string, aspectRatio: string = "16:9"
   const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
   const blob = await response.blob();
   return URL.createObjectURL(blob);
+};
+
+/**
+ * Generates speech using gemini-2.5-flash-preview-tts.
+ */
+export const generateSpeech = async (text: string): Promise<string> => {
+  const ai = getAiClient();
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash-preview-tts",
+    contents: [{ parts: [{ text }] }],
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: 'Kore' },
+        },
+      },
+    },
+  });
+
+  const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!audioData) {
+    throw new Error("No audio data received");
+  }
+  return audioData;
 };

@@ -3,6 +3,11 @@ export enum Role {
   MODEL = 'model'
 }
 
+export enum Modality {
+  AUDIO = 'AUDIO',
+  TEXT = 'TEXT'
+}
+
 export interface Attachment {
   type: 'image' | 'video';
   url: string;

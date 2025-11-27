@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
 import AuthScreen from './components/AuthScreen';
-import { SendIcon, MenuIcon, ChevronDownIcon, ActivityIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon, UndoIcon, RedoIcon } from './components/Icon';
+import { SendIcon, MenuIcon, ChevronDownIcon, ActivityIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon, UndoIcon, RedoIcon, SparklesIcon, BroomIcon, XIcon } from './components/Icon';
 import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, UI_TEXT } from './constants';
 import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, Attachment } from './types';
 import { streamGeminiResponse, generateImage, generateVideo } from './services/geminiService';
@@ -38,6 +38,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelConfig>(GEMINI_MODELS[0]);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   
   // Media Config State
   const [imageSize, setImageSize] = useState("1K");
@@ -151,6 +152,21 @@ function App() {
     if (currentSessionId === sessionId) {
       setCurrentSessionId(updatedSessions.length > 0 ? updatedSessions[0].id : null);
     }
+  };
+
+  const clearCurrentChat = () => {
+    if (!user || !currentSessionId) return;
+    
+    const updatedSessions = sessions.map(s => {
+      if (s.id === currentSessionId) {
+        return { ...s, messages: [], updatedAt: Date.now() };
+      }
+      return s;
+    });
+
+    setSessions(updatedSessions);
+    saveSessionsToStorage(updatedSessions, user.id);
+    setShowClearConfirm(false);
   };
 
   // --- Authentication & User Logic ---
@@ -284,10 +300,84 @@ function App() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
-    // We simple set it. The useHistory hook tracks every change. 
-    // For a production app, we might want to debounce history commits, but for "Undo/Redo" feature demo, 
-    // granular is often expected or acceptable.
     setInputValue(val);
+  };
+
+  const handleSummarize = async () => {
+    if (!currentSessionId || isLoading || !user) return;
+    const msgs = getCurrentMessages();
+    if (msgs.length === 0) return;
+
+    setIsLoading(true);
+    const summaryPrompt = language === 'zh' 
+      ? "请简洁总结以下对话：" 
+      : "Please summarize the following conversation concisely:";
+    
+    // Create text representation of history
+    const context = msgs.map(m => `${m.role}: ${m.text}`).join('\n');
+    const fullPrompt = `${summaryPrompt}\n\n${context}`;
+
+    // Add model placeholder
+    const targetSessionId = currentSessionId;
+    const modelMsgId = uuidv4();
+    
+    // Update State to show Loading Bubble
+    const initialModelMsg: ChatMessage = {
+      id: modelMsgId,
+      role: Role.MODEL,
+      text: "", 
+      timestamp: Date.now()
+    };
+
+    const updatedSessions = sessions.map(s => {
+      if (s.id === targetSessionId) {
+        return { ...s, messages: [...s.messages, initialModelMsg] };
+      }
+      return s;
+    });
+    setSessions(updatedSessions);
+
+    try {
+      const summary = await streamGeminiResponse(
+        'gemini-2.5-flash', // Use Flash for summary
+        [],
+        fullPrompt,
+        language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN,
+        (text) => {
+             setSessions((prev) => {
+               const news = [...prev];
+               const s = news.find(sess => sess.id === targetSessionId);
+               const m = s?.messages.find(msg => msg.id === modelMsgId);
+               if (m) m.text = text;
+               return news;
+            }, true);
+        }
+      );
+      
+      // Final Update
+      const finalSessions = sessions.map(s => {
+          if (s.id === targetSessionId) {
+            const ms = s.messages.map(m => m.id === modelMsgId ? { ...m, text: summary } : m);
+            return { ...s, messages: ms, updatedAt: Date.now() };
+          }
+          return s;
+      });
+      setSessions(finalSessions);
+      saveSessionsToStorage(finalSessions, user.id);
+
+    } catch (e) {
+      console.error(e);
+      // Remove loading bubble on error
+       const revertedSessions = sessions.map(s => {
+        if (s.id === targetSessionId) {
+          return { ...s, messages: s.messages.filter(m => m.id !== modelMsgId) };
+        }
+        return s;
+      });
+      setSessions(revertedSessions);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSendMessage = useCallback(async () => {
@@ -314,9 +404,6 @@ function App() {
     }
 
     const userText = inputValue.trim();
-    // Clear input and reset its history for the new message? 
-    // Usually input history is preserved, but clearing it makes sense.
-    // We'll just set it to empty.
     setInputValue(""); 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
@@ -458,6 +545,30 @@ function App() {
         />
       )}
 
+      {/* Confirmation Dialog */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-nexus-800 border border-nexus-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full transform transition-all scale-100">
+            <h3 className="text-lg font-bold text-white mb-2">{t.clearChat}?</h3>
+            <p className="text-sm text-gray-400 mb-6">{t.confirmClear}</p>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setShowClearConfirm(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-nexus-700 transition-colors"
+              >
+                {t.cancel}
+              </button>
+              <button 
+                onClick={clearCurrentChat}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors shadow-lg shadow-red-500/20"
+              >
+                {t.clearChat}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar Component */}
       <Sidebar 
         isOpen={sidebarOpen} 
@@ -529,25 +640,26 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4">
-             {/* Session Undo Controls (Hidden on small screens if strict space, but fine here) */}
-             <div className="hidden md:flex gap-1">
-                <button 
-                  onClick={sessionsControl.undo} 
-                  disabled={!sessionsControl.canUndo}
-                  className={`p-1.5 rounded transition-colors ${sessionsControl.canUndo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}
-                  title="Undo Session Change"
-                >
-                  <UndoIcon />
-                </button>
-                <button 
-                  onClick={sessionsControl.redo} 
-                  disabled={!sessionsControl.canRedo}
-                  className={`p-1.5 rounded transition-colors ${sessionsControl.canRedo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}
-                  title="Redo Session Change"
-                >
-                  <RedoIcon />
-                </button>
-             </div>
+            
+            {/* Actions for current session */}
+            {currentSessionId && activeMessages.length > 0 && !isLoading && (
+              <div className="flex items-center gap-1 border-r border-nexus-700 pr-4 mr-1">
+                 <button 
+                   onClick={handleSummarize}
+                   className="p-2 text-gray-400 hover:text-nexus-accent hover:bg-nexus-800 rounded-lg transition-colors"
+                   title={t.summarize}
+                 >
+                   <SparklesIcon />
+                 </button>
+                 <button 
+                   onClick={() => setShowClearConfirm(true)}
+                   className="p-2 text-gray-400 hover:text-red-400 hover:bg-nexus-800 rounded-lg transition-colors"
+                   title={t.clearChat}
+                 >
+                   <BroomIcon />
+                 </button>
+              </div>
+            )}
 
             {/* Status Indicator */}
             <div className="flex items-center gap-2 px-3 py-1 bg-nexus-800 rounded-full border border-nexus-700">
@@ -598,7 +710,7 @@ function App() {
 
         {/* Input Area */}
         <div className="p-4 bg-nexus-900 border-t border-nexus-700">
-          <div className="max-w-3xl mx-auto relative">
+          <div className="max-w-3xl mx-auto relative group">
             
             {/* Toolbar (Markdown + Media Config) */}
             <div className="flex items-center justify-between mb-2 px-1">
@@ -662,33 +774,36 @@ function App() {
 
             </div>
 
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={inputValue}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={inputPlaceholder}
-              className="w-full bg-nexus-800 text-white placeholder-gray-500 border border-nexus-700 rounded-2xl pl-5 pr-14 py-4 focus:outline-none focus:border-nexus-accent focus:ring-1 focus:ring-nexus-accent resize-none overflow-hidden transition-all shadow-sm text-base font-sans"
-            />
-            
-            <button
-              onClick={handleSendMessage}
-              disabled={isLoading || !inputValue.trim()}
-              className={`
-                absolute right-2 bottom-2 p-2.5 rounded-xl transition-all duration-200
-                ${inputValue.trim() && !isLoading 
-                  ? 'bg-nexus-accent text-white hover:bg-nexus-accentHover shadow-lg' 
-                  : 'bg-nexus-700 text-gray-500 cursor-not-allowed'}
-              `}
-            >
-              <SendIcon />
-            </button>
+            {/* Styled Input Container with Glassmorphism and Focus effects */}
+            <div className="relative rounded-2xl bg-nexus-800/80 backdrop-blur-sm border border-nexus-700 shadow-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-nexus-accent/50 focus-within:border-nexus-accent focus-within:shadow-lg focus-within:bg-nexus-800">
+                <textarea
+                ref={textareaRef}
+                rows={1}
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder={inputPlaceholder}
+                className="w-full bg-transparent text-white placeholder-gray-500 rounded-2xl pl-5 pr-14 py-4 focus:outline-none resize-none overflow-hidden text-base font-sans"
+                />
+                
+                <button
+                onClick={handleSendMessage}
+                disabled={isLoading || !inputValue.trim()}
+                className={`
+                    absolute right-2 bottom-2 p-2.5 rounded-xl transition-all duration-300 transform
+                    ${inputValue.trim() && !isLoading 
+                    ? 'bg-nexus-accent text-white hover:bg-nexus-accentHover shadow-md hover:scale-105' 
+                    : 'bg-nexus-700/50 text-gray-500 cursor-not-allowed'}
+                `}
+                >
+                <SendIcon />
+                </button>
+            </div>
           </div>
-          <div className="text-center mt-2 flex justify-center items-center gap-2">
+          <div className="text-center mt-3 flex justify-center items-center gap-2 opacity-60">
             <ActivityIcon />
-            <span className="text-[10px] text-gray-600 font-mono">
-              Nexus Core v2.1 • {selectedModel.name}
+            <span className="text-[10px] text-gray-500 font-mono tracking-wider">
+              NEXUS CORE SYSTEM V2.2 // {selectedModel.name.toUpperCase()}
             </span>
           </div>
         </div>

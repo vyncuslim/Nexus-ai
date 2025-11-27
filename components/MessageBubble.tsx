@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, Role } from '../types';
-import { RobotIcon, UserIcon, CopyIcon, CheckIcon } from './Icon';
+import { RobotIcon, UserIcon, CopyIcon, CheckIcon, SpeakerIcon, StopIcon } from './Icon';
+import { generateSpeech } from '../services/geminiService';
+import { playAudioContent } from '../utils/audio';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -36,6 +38,51 @@ const CodeBlock = ({ content }: { content: string }) => {
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const isUser = message.role === Role.USER;
   const isError = message.isError;
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+  // Stop audio if component unmounts
+  useEffect(() => {
+    return () => {
+      if (audioSourceRef.current) {
+        try { audioSourceRef.current.stop(); } catch(e) {}
+      }
+    };
+  }, []);
+
+  const toggleSpeech = async () => {
+    if (isSpeaking) {
+      if (audioSourceRef.current) {
+        try { audioSourceRef.current.stop(); } catch(e) {}
+        audioSourceRef.current = null;
+      }
+      setIsSpeaking(false);
+      return;
+    }
+
+    setIsLoadingAudio(true);
+    try {
+      // 1. Generate Audio
+      const base64Audio = await generateSpeech(message.text);
+      
+      // 2. Play Audio
+      const source = await playAudioContent(base64Audio);
+      audioSourceRef.current = source;
+      setIsSpeaking(true);
+      
+      source.onended = () => {
+        setIsSpeaking(false);
+        audioSourceRef.current = null;
+      };
+
+    } catch (err) {
+      console.error("TTS Error", err);
+      // Optional: Show toast or feedback
+    } finally {
+      setIsLoadingAudio(false);
+    }
+  };
 
   // Basic formatting for code blocks, bold text, and links
   const formatText = (text: string) => {
@@ -101,7 +148,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
         {/* Bubble */}
         <div className={`
-          relative px-4 py-3 rounded-2xl shadow-sm border
+          relative px-4 py-3 rounded-2xl shadow-sm border group
           ${isUser 
             ? 'bg-nexus-700 text-white rounded-tr-sm border-transparent' 
             : isError 
@@ -109,9 +156,32 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               : 'bg-nexus-800 text-gray-100 rounded-tl-sm border-nexus-700'}
         `}>
           {/* Label */}
-          <div className="text-xs font-semibold opacity-50 mb-1 flex justify-between">
+          <div className="text-xs font-semibold opacity-50 mb-1 flex justify-between items-center">
             <span>{isUser ? 'You' : 'Nexus'}</span>
-            {isError && <span className="text-red-400 ml-2">ERROR</span>}
+            <div className="flex items-center gap-2">
+               {isError && <span className="text-red-400 ml-2">ERROR</span>}
+               
+               {/* TTS Button (Only for Model) */}
+               {!isUser && !isError && message.text && (
+                 <button 
+                   onClick={toggleSpeech}
+                   disabled={isLoadingAudio}
+                   className={`
+                     p-1 rounded transition-colors
+                     ${isSpeaking ? 'text-nexus-accent bg-nexus-900/50' : 'text-gray-500 hover:text-white'}
+                   `}
+                   title={isSpeaking ? "Stop" : "Read Aloud"}
+                 >
+                   {isLoadingAudio ? (
+                     <span className="block w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></span>
+                   ) : isSpeaking ? (
+                     <StopIcon />
+                   ) : (
+                     <SpeakerIcon />
+                   )}
+                 </button>
+               )}
+            </div>
           </div>
           
           <div className="text-sm md:text-base">

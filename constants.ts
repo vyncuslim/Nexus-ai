@@ -76,6 +76,10 @@ export const UI_TEXT = {
     profile: "User Profile",
     promptPlaceholderImage: "Describe the image to generate...",
     promptPlaceholderVideo: "Describe the video to generate...",
+    summarize: "Summarize",
+    clearChat: "Clear Context",
+    confirmClear: "Are you sure you want to clear all messages in this session?",
+    ttsError: "Failed to generate speech.",
   },
   zh: {
     newChat: "新建会话",
@@ -112,5 +116,9 @@ export const UI_TEXT = {
     profile: "用户档案",
     promptPlaceholderImage: "描述您想生成的图像...",
     promptPlaceholderVideo: "描述您想生成的视频...",
+    summarize: "生成摘要",
+    clearChat: "清空上下文",
+    confirmClear: "您确定要清空当前会话的所有消息吗？",
+    ttsError: "语音生成失败。",
   }
 };
