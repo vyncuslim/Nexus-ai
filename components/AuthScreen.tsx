@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { Language } from '../types';
 import { UI_TEXT, validateInviteCode } from '../constants';
+import { GoogleIcon, OpenAIIcon } from './Icon';
 
 interface AuthScreenProps {
-  onAuthSuccess: (inviteCode: string, name: string, apiKey: string) => void;
+  onAuthSuccess: (inviteCode: string, name: string, keys: { openai?: string, google?: string }) => void;
   language: Language;
 }
 
 const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
-  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Invite, 2: Name, 3: Key
+  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Invite, 2: Name, 3: Keys
   const [inviteCode, setInviteCode] = useState('');
   const [name, setName] = useState('');
-  const [apiKey, setApiKey] = useState('');
+  const [openaiKey, setOpenaiKey] = useState('');
+  const [googleKey, setGoogleKey] = useState('');
   const [error, setError] = useState<string | null>(null);
   
   const t = UI_TEXT[language];
@@ -35,11 +37,20 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
 
   const handleKeySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (apiKey.trim().startsWith('sk-')) {
-      onAuthSuccess(inviteCode, name, apiKey);
-    } else {
-      setError("Invalid OpenAI API Key format (must start with sk-)");
+    // Validate that at least one key is present if we want to enforce it, or just pass empty
+    // Basic validation
+    const validOpenAI = openaiKey.trim().startsWith('sk-');
+    const validGoogle = googleKey.trim().length > 10; // Simple length check
+
+    if (!validOpenAI && !validGoogle) {
+      setError(t.keysHelp);
+      return;
     }
+
+    onAuthSuccess(inviteCode, name, {
+      openai: validOpenAI ? openaiKey.trim() : undefined,
+      google: validGoogle ? googleKey.trim() : undefined
+    });
   };
 
   return (
@@ -118,23 +129,38 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
               </form>
             )}
 
-             {/* STEP 3: API KEY */}
+             {/* STEP 3: API KEYS */}
              {step === 3 && (
               <form onSubmit={handleKeySubmit} className="space-y-4">
-                <input 
-                  type="password" 
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="w-full bg-nexus-900/80 border border-nexus-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono placeholder-gray-600 text-sm text-center"
-                  placeholder={t.apiKeyPlaceholder}
-                  autoFocus
-                />
+                <div className="space-y-3">
+                  <div className="relative">
+                    <div className="absolute left-3 top-3 text-gray-500"><OpenAIIcon /></div>
+                    <input 
+                      type="password" 
+                      value={openaiKey}
+                      onChange={(e) => setOpenaiKey(e.target.value)}
+                      className="w-full bg-nexus-900/80 border border-nexus-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono placeholder-gray-600 text-sm"
+                      placeholder={t.openaiKeyPlaceholder}
+                    />
+                  </div>
+                  
+                  <div className="relative">
+                     <div className="absolute left-3 top-3 text-gray-500"><GoogleIcon /></div>
+                     <input 
+                      type="password" 
+                      value={googleKey}
+                      onChange={(e) => setGoogleKey(e.target.value)}
+                      className="w-full bg-nexus-900/80 border border-nexus-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono placeholder-gray-600 text-sm"
+                      placeholder={t.googleKeyPlaceholder}
+                    />
+                  </div>
+                </div>
+
                 <p className="text-[10px] text-gray-500 text-center">
-                  Your key is stored locally on your device.
+                  {t.keysHelp}
                 </p>
                  <button 
                   type="submit"
-                  disabled={!apiKey.trim()}
                   className="w-full py-3.5 rounded-xl font-bold tracking-wide bg-emerald-600 text-white shadow-lg hover:bg-emerald-500 transition-all"
                 >
                   {t.connectBtn}

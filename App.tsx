@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
 import AuthScreen from './components/AuthScreen';
-import { SendIcon, MenuIcon, ChevronDownIcon, ActivityIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon, UndoIcon, RedoIcon, SparklesIcon, BroomIcon, XIcon } from './components/Icon';
+import { SendIcon, MenuIcon, ChevronDownIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon, UndoIcon, RedoIcon, SparklesIcon, BroomIcon, GoogleIcon, OpenAIIcon, CodeBlockIcon } from './components/Icon';
 import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, UI_TEXT } from './constants';
-import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, Attachment } from './types';
+import { ChatMessage, Role, ModelConfig, ChatSession, User, Language } from './types';
 import { streamGeminiResponse, generateImage, generateVideo } from './services/geminiService';
 import { useHistory } from './hooks/useHistory';
 import { v4 as uuidv4 } from 'uuid';
@@ -12,14 +12,16 @@ import { v4 as uuidv4 } from 'uuid';
 function App() {
   // --- Persistent State Keys ---
   const STORAGE_KEY_USER = 'nexus_user_v2';
-  const STORAGE_KEY_API_KEY = 'nexus_api_key';
+  const STORAGE_KEY_OPENAI_KEY = 'nexus_openai_key';
+  const STORAGE_KEY_GOOGLE_KEY = 'nexus_google_key';
   const STORAGE_KEY_INVITE_CODE = 'nexus_invite_code';
   const STORAGE_KEY_SESSIONS_PREFIX = 'nexus_sessions_';
   const STORAGE_KEY_PREFS = 'nexus_preferences';
 
   // --- State ---
   const [user, setUser] = useState<User | null>(null);
-  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [openaiKey, setOpenaiKey] = useState<string | null>(null);
+  const [googleKey, setGoogleKey] = useState<string | null>(null);
   const [language, setLanguage] = useState<Language>('en');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
@@ -60,14 +62,16 @@ function App() {
 
     // Load Auth
     const storedUser = localStorage.getItem(STORAGE_KEY_USER);
-    const storedKey = localStorage.getItem(STORAGE_KEY_API_KEY);
+    const storedOpenAI = localStorage.getItem(STORAGE_KEY_OPENAI_KEY);
+    const storedGoogle = localStorage.getItem(STORAGE_KEY_GOOGLE_KEY);
     const storedInvite = localStorage.getItem(STORAGE_KEY_INVITE_CODE);
 
-    if (storedUser && storedKey && storedInvite) {
+    if (storedUser && storedInvite && (storedOpenAI || storedGoogle)) {
       try {
         const u = JSON.parse(storedUser);
         setUser(u);
-        setApiKey(storedKey);
+        if (storedOpenAI) setOpenaiKey(storedOpenAI);
+        if (storedGoogle) setGoogleKey(storedGoogle);
         loadSessions(u.id);
       } catch (e) { console.error(e); }
     }
@@ -170,7 +174,7 @@ function App() {
   };
 
   // --- Authentication Logic ---
-  const handleAuthSuccess = (inviteCode: string, name: string, key: string) => {
+  const handleAuthSuccess = (inviteCode: string, name: string, keys: { openai?: string, google?: string }) => {
     // Generate simple User object
     const u: User = {
       id: btoa(inviteCode + name), // Simple ID
@@ -179,10 +183,16 @@ function App() {
     };
 
     setUser(u);
-    setApiKey(key);
+    if (keys.openai) {
+      setOpenaiKey(keys.openai);
+      localStorage.setItem(STORAGE_KEY_OPENAI_KEY, keys.openai);
+    }
+    if (keys.google) {
+      setGoogleKey(keys.google);
+      localStorage.setItem(STORAGE_KEY_GOOGLE_KEY, keys.google);
+    }
     
     localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(u));
-    localStorage.setItem(STORAGE_KEY_API_KEY, key);
     localStorage.setItem(STORAGE_KEY_INVITE_CODE, inviteCode);
     
     loadSessions(u.id);
@@ -197,13 +207,15 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
-    setApiKey(null);
+    setOpenaiKey(null);
+    setGoogleKey(null);
     setSessions([], true);
     setCurrentSessionId(null);
     
     // Clear all auth data
     localStorage.removeItem(STORAGE_KEY_USER);
-    localStorage.removeItem(STORAGE_KEY_API_KEY);
+    localStorage.removeItem(STORAGE_KEY_OPENAI_KEY);
+    localStorage.removeItem(STORAGE_KEY_GOOGLE_KEY);
     localStorage.removeItem(STORAGE_KEY_INVITE_CODE);
     
     setSidebarOpen(false);
@@ -269,8 +281,15 @@ function App() {
     setInputValue(e.target.value);
   };
 
+  const getActiveKey = (provider: 'openai' | 'google') => {
+    return provider === 'openai' ? openaiKey : googleKey;
+  };
+
   const handleSummarize = async () => {
-    if (!currentSessionId || isLoading || !user || !apiKey) return;
+    if (!currentSessionId || isLoading || !user) return;
+    const key = getActiveKey('openai') || getActiveKey('google'); // Use whatever key is available
+    if (!key) return; // Prompt user?
+
     const msgs = getCurrentMessages();
     if (msgs.length === 0) return;
 
@@ -302,8 +321,13 @@ function App() {
     setSessions(updatedSessions);
 
     try {
-      const summary = await streamGeminiResponse(
-        'gpt-3.5-turbo', 
+      // Use basic flash or gpt-3.5 for summary
+      const model = openaiKey 
+        ? GEMINI_MODELS.find(m => m.id === 'gpt-3.5-turbo')!
+        : GEMINI_MODELS.find(m => m.id === 'gemini-2.5-flash')!;
+        
+      await streamGeminiResponse(
+        model,
         [],
         fullPrompt,
         language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN,
@@ -316,12 +340,14 @@ function App() {
                return news;
             }, true);
         },
-        apiKey
+        getActiveKey(model.provider)!
       );
       
       const finalSessions = sessions.map(s => {
           if (s.id === targetSessionId) {
-            const ms = s.messages.map(m => m.id === modelMsgId ? { ...m, text: summary } : m);
+            const sCurrent = sessions.find(sess => sess.id === targetSessionId); // get latest
+            const msg = sCurrent?.messages.find(m => m.id === modelMsgId);
+            const ms = s.messages.map(m => m.id === modelMsgId ? { ...m, text: msg ? msg.text : "" } : m);
             return { ...s, messages: ms, updatedAt: Date.now() };
           }
           return s;
@@ -344,8 +370,14 @@ function App() {
   };
 
   const handleSendMessage = useCallback(async () => {
-    if (!inputValue.trim() || isLoading || !user || !apiKey) return;
+    if (!inputValue.trim() || isLoading || !user) return;
     
+    const apiKey = getActiveKey(selectedModel.provider);
+    if (!apiKey) {
+      alert(`Missing API Key for ${selectedModel.provider}. Please log out and enter the key.`);
+      return;
+    }
+
     const currentUserId = user.id;
     let targetSessionId = currentSessionId;
     let targetSession = sessions.find(s => s.id === targetSessionId);
@@ -388,7 +420,7 @@ function App() {
 
     try {
       if (selectedModel.category === 'image') {
-        const imageUrl = await generateImage(userText, imageSize, apiKey);
+        const imageUrl = await generateImage(selectedModel, userText, imageSize, apiKey);
         const modelMsg: ChatMessage = {
           id: uuidv4(),
           role: Role.MODEL,
@@ -399,8 +431,15 @@ function App() {
         targetSession.messages.push(modelMsg);
 
       } else if (selectedModel.category === 'video') {
-        // Video disabled in this version
-        throw new Error("Video generation is not supported in this version.");
+        const videoUrl = await generateVideo(selectedModel, userText, videoAspectRatio, apiKey);
+        const modelMsg: ChatMessage = {
+            id: uuidv4(),
+            role: Role.MODEL,
+            text: language === 'zh' ? `视频生成完毕。` : `Video generated successfully.`,
+            attachment: { type: 'video', url: videoUrl },
+            timestamp: Date.now()
+        };
+        targetSession.messages.push(modelMsg);
 
       } else {
         const modelMsgId = uuidv4();
@@ -416,7 +455,7 @@ function App() {
         const systemInstruction = language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN;
 
         const finalResponseText = await streamGeminiResponse(
-          selectedModel.id,
+          selectedModel,
           targetSession.messages.slice(0, -1),
           userText,
           systemInstruction,
@@ -452,7 +491,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, apiKey, language, imageSize, videoAspectRatio, setSessions, setInputValue]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, googleKey, language, imageSize, videoAspectRatio, setSessions, setInputValue]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -469,7 +508,7 @@ function App() {
 
   const t = UI_TEXT[language];
 
-  if (!user || !apiKey) {
+  if (!user || (!openaiKey && !googleKey)) {
     return <AuthScreen onAuthSuccess={handleAuthSuccess} language={language} />;
   }
 
@@ -538,8 +577,7 @@ function App() {
                 onClick={() => setModelMenuOpen(!modelMenuOpen)}
                 className="flex items-center gap-2 px-3 py-1.5 hover:bg-nexus-800 rounded-lg transition-colors text-sm font-medium"
               >
-                {selectedModel.category === 'image' && <ImageIcon />}
-                {selectedModel.category === 'video' && <VideoIcon />}
+                {selectedModel.provider === 'openai' ? <OpenAIIcon /> : <GoogleIcon />}
                 <span className={selectedModel.isPro ? "text-purple-400" : "text-emerald-400"}>
                   {selectedModel.name}
                 </span>
@@ -558,7 +596,7 @@ function App() {
                       className={`w-full text-left px-4 py-3 rounded-lg text-sm mb-1 transition-colors ${selectedModel.id === model.id ? 'bg-nexus-700' : 'hover:bg-nexus-700/50'}`}
                     >
                       <div className="flex items-center gap-2">
-                         {model.category === 'image' && <ImageIcon />}
+                         {model.provider === 'openai' ? <OpenAIIcon /> : <GoogleIcon />}
                         <span className={`font-semibold ${model.isPro ? 'text-purple-400' : 'text-emerald-400'}`}>
                            {model.name}
                         </span>
@@ -639,14 +677,14 @@ function App() {
             
             <div className="flex items-center justify-between mb-2 px-1">
               <div className="flex items-center gap-1">
-                <button onClick={() => wrapSelection('**', '**', 'bold text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors"><BoldIcon /></button>
-                <button onClick={() => wrapSelection('_', '_', 'italic text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors"><ItalicIcon /></button>
-                <button onClick={() => wrapSelection('`', '`', 'code')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors"><CodeIcon /></button>
-                <button onClick={() => wrapSelection('```\n', '\n```', 'code block')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors"><div className="scale-75"><CodeIcon /></div></button>
-                <button onClick={() => wrapSelection('[', '](url)', 'link text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors"><LinkIcon /></button>
+                <button onClick={() => wrapSelection('**', '**', 'bold text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Bold"><BoldIcon /></button>
+                <button onClick={() => wrapSelection('_', '_', 'italic text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Italic"><ItalicIcon /></button>
+                <button onClick={() => wrapSelection('`', '`', 'code')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Inline Code"><CodeIcon /></button>
+                <button onClick={() => wrapSelection('```\n', '\n```', 'code block')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Code Block"><CodeBlockIcon /></button>
+                <button onClick={() => wrapSelection('[', '](url)', 'link text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Link"><LinkIcon /></button>
                 <div className="w-px h-4 bg-nexus-700 mx-2"></div>
-                <button onClick={inputControl.undo} disabled={!inputControl.canUndo} className={`p-1.5 rounded transition-colors ${inputControl.canUndo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}><UndoIcon /></button>
-                <button onClick={inputControl.redo} disabled={!inputControl.canRedo} className={`p-1.5 rounded transition-colors ${inputControl.canRedo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}><RedoIcon /></button>
+                <button onClick={inputControl.undo} disabled={!inputControl.canUndo} className={`p-1.5 rounded transition-colors ${inputControl.canUndo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`} title="Undo"><UndoIcon /></button>
+                <button onClick={inputControl.redo} disabled={!inputControl.canRedo} className={`p-1.5 rounded transition-colors ${inputControl.canRedo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`} title="Redo"><RedoIcon /></button>
               </div>
             </div>
 

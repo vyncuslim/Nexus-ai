@@ -1,24 +1,25 @@
-import { ChatMessage, Role } from "../types";
+import { ChatMessage, Role, AIProvider, ModelConfig } from "../types";
+import { GoogleGenAI, Modality } from "@google/genai";
 
 /**
- * Service to interact with OpenAI API.
- * Replaces the previous Gemini implementation.
+ * Unified AI Service
+ * Supports both OpenAI (via Fetch) and Google Gemini (via SDK).
  */
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_IMAGE_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_TTS_URL = "https://api.openai.com/v1/audio/speech";
 
-const getHeaders = (apiKey: string) => ({
+const getOpenAIHeaders = (apiKey: string) => ({
   "Content-Type": "application/json",
   "Authorization": `Bearer ${apiKey}`
 });
 
 /**
- * Streams text response from OpenAI (ChatGPT).
+ * Stream Response (Unified)
  */
 export const streamGeminiResponse = async (
-  modelId: string,
+  model: ModelConfig,
   history: ChatMessage[],
   newMessage: string,
   systemInstruction: string,
@@ -27,130 +28,240 @@ export const streamGeminiResponse = async (
 ): Promise<string> => {
   if (!apiKey) throw new Error("API Key missing");
 
+  if (model.provider === 'openai') {
+    return streamOpenAIResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey);
+  } else {
+    return streamGoogleResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey);
+  }
+};
+
+/**
+ * OpenAI Implementation
+ */
+const streamOpenAIResponse = async (
+  modelId: string,
+  history: ChatMessage[],
+  newMessage: string,
+  systemInstruction: string,
+  onChunk: (text: string) => void,
+  apiKey: string
+): Promise<string> => {
   const messages = [
     { role: "system", content: systemInstruction },
     ...history.map(m => ({ role: m.role === Role.USER ? "user" : "assistant", content: m.text })),
     { role: "user", content: newMessage }
   ];
 
-  try {
-    const response = await fetch(OPENAI_API_URL, {
-      method: "POST",
-      headers: getHeaders(apiKey),
-      body: JSON.stringify({
-        model: modelId,
-        messages: messages,
-        stream: true
-      })
-    });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error?.message || "OpenAI API Error");
-    }
-
-    if (!response.body) throw new Error("No response body");
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let fullText = "";
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      
-      const chunk = decoder.decode(value, { stream: true });
-      buffer += chunk;
-      
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed === "data: [DONE]") break;
-        if (trimmed.startsWith("data: ")) {
-          try {
-            const json = JSON.parse(trimmed.slice(6));
-            const content = json.choices[0]?.delta?.content || "";
-            if (content) {
-              fullText += content;
-              onChunk(fullText);
-            }
-          } catch (e) {
-            // Ignore parse errors for partial chunks
-          }
-        }
-      }
-    }
-
-    return fullText;
-
-  } catch (error) {
-    console.error("OpenAI Text Service Error:", error);
-    throw error;
-  }
-};
-
-/**
- * Generates an image using DALL-E 3.
- */
-export const generateImage = async (prompt: string, imageSize: string = "1024x1024", apiKey?: string): Promise<string> => {
-  if (!apiKey) throw new Error("API Key missing");
-
-  // OpenAI supports 1024x1024 standard for DALL-E 3
-  const size = "1024x1024"; 
-
-  const response = await fetch(OPENAI_IMAGE_URL, {
+  const response = await fetch(OPENAI_API_URL, {
     method: "POST",
-    headers: getHeaders(apiKey),
+    headers: getOpenAIHeaders(apiKey),
     body: JSON.stringify({
-      model: "dall-e-3",
-      prompt: prompt,
-      n: 1,
-      size: size,
-      response_format: "b64_json"
+      model: modelId,
+      messages: messages,
+      stream: true
     })
   });
 
   if (!response.ok) {
     const err = await response.json();
-    throw new Error(err.error?.message || "Image Gen Error");
+    throw new Error(err.error?.message || "OpenAI API Error");
   }
 
-  const data = await response.json();
-  const b64 = data.data[0].b64_json;
-  return `data:image/png;base64,${b64}`;
+  if (!response.body) throw new Error("No response body");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let fullText = "";
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    const chunk = decoder.decode(value, { stream: true });
+    buffer += chunk;
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed === "data: [DONE]") break;
+      if (trimmed.startsWith("data: ")) {
+        try {
+          const json = JSON.parse(trimmed.slice(6));
+          const content = json.choices[0]?.delta?.content || "";
+          if (content) {
+            fullText += content;
+            onChunk(fullText);
+          }
+        } catch (e) { /* ignore */ }
+      }
+    }
+  }
+  return fullText;
 };
 
 /**
- * Placeholder for Video - OpenAI doesn't have public Video API yet.
+ * Google Gemini Implementation
  */
-export const generateVideo = async (prompt: string, aspectRatio: string = "16:9", apiKey?: string): Promise<string> => {
-  throw new Error("Video generation is not currently supported by this OpenAI integration.");
-};
+const streamGoogleResponse = async (
+  modelId: string,
+  history: ChatMessage[],
+  newMessage: string,
+  systemInstruction: string,
+  onChunk: (text: string) => void,
+  apiKey: string
+): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey });
+  
+  // Transform history to Google format
+  const googleHistory = history.map(msg => ({
+    role: msg.role === Role.USER ? 'user' : 'model',
+    parts: [{ text: msg.text }],
+  }));
 
-/**
- * Generates speech using OpenAI TTS.
- */
-export const generateSpeech = async (text: string, apiKey?: string): Promise<string> => {
-  if (!apiKey) throw new Error("API Key missing");
-
-  const response = await fetch(OPENAI_TTS_URL, {
-    method: "POST",
-    headers: getHeaders(apiKey),
-    body: JSON.stringify({
-      model: "tts-1",
-      input: text,
-      voice: "alloy"
-    })
+  const chat = ai.chats.create({
+    model: modelId,
+    history: googleHistory,
+    config: { systemInstruction }
   });
 
-  if (!response.ok) throw new Error("TTS Error");
-
-  const blob = await response.blob();
+  const result = await chat.sendMessageStream({ message: newMessage });
   
-  // Convert blob to base64
+  let fullText = "";
+  for await (const chunk of result) {
+    const text = chunk.text;
+    if (text) {
+      fullText += text;
+      onChunk(fullText);
+    }
+  }
+  return fullText;
+};
+
+/**
+ * Image Generation (Unified)
+ */
+export const generateImage = async (
+  model: ModelConfig,
+  prompt: string, 
+  imageSize: string = "1024x1024", 
+  apiKey?: string
+): Promise<string> => {
+  if (!apiKey) throw new Error("API Key missing");
+
+  if (model.provider === 'openai') {
+    // DALL-E 3
+    const response = await fetch(OPENAI_IMAGE_URL, {
+      method: "POST",
+      headers: getOpenAIHeaders(apiKey),
+      body: JSON.stringify({
+        model: "dall-e-3",
+        prompt: prompt,
+        n: 1,
+        size: "1024x1024", // OpenAI standard
+        response_format: "b64_json"
+      })
+    });
+    if (!response.ok) throw new Error("OpenAI Image Error");
+    const data = await response.json();
+    return `data:image/png;base64,${data.data[0].b64_json}`;
+
+  } else {
+    // Gemini Image
+    const ai = new GoogleGenAI({ apiKey });
+    // Map simplified size to Google config if needed, or default
+    const config = {
+      imageConfig: { imageSize: "1K" } // forcing 1K for now as 2K/4K is specific to Pro
+    };
+    if (imageSize === "2K") config.imageConfig.imageSize = "2K";
+    // if (imageSize === "4K") config.imageConfig.imageSize = "4K"; // Only if model supports it
+
+    const response = await ai.models.generateContent({
+      model: model.id,
+      contents: { parts: [{ text: prompt }] },
+      config: config
+    });
+    
+    // Find image part
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+       if (part.inlineData) {
+         return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+       }
+    }
+    throw new Error("No image generated by Gemini");
+  }
+};
+
+/**
+ * Video Generation (Google Only)
+ */
+export const generateVideo = async (
+  model: ModelConfig,
+  prompt: string, 
+  aspectRatio: string = "16:9", 
+  apiKey?: string
+): Promise<string> => {
+  if (!apiKey) throw new Error("API Key missing");
+  if (model.provider === 'openai') throw new Error("OpenAI does not support Video generation yet.");
+
+  const ai = new GoogleGenAI({ apiKey });
+  
+  let operation = await ai.models.generateVideos({
+    model: model.id,
+    prompt: prompt,
+    config: {
+      numberOfVideos: 1,
+      resolution: '720p',
+      aspectRatio: aspectRatio === '16:9' ? '16:9' : '9:16'
+    }
+  });
+
+  // Polling
+  while (!operation.done) {
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    operation = await ai.operations.getVideosOperation({operation});
+  }
+
+  const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+  if (!videoUri) throw new Error("Video generation failed");
+
+  // Fetch the actual bytes using the key
+  const res = await fetch(`${videoUri}&key=${apiKey}`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+};
+
+/**
+ * Speech Generation (Unified)
+ */
+export const generateSpeech = async (text: string, apiKey?: string, provider: AIProvider = 'google'): Promise<string> => {
+  if (!apiKey) throw new Error("API Key missing");
+
+  if (provider === 'openai') {
+    const response = await fetch(OPENAI_TTS_URL, {
+      method: "POST",
+      headers: getOpenAIHeaders(apiKey),
+      body: JSON.stringify({ model: "tts-1", input: text, voice: "alloy" })
+    });
+    const blob = await response.blob();
+    return blobToBase64(blob);
+  } else {
+    // Google TTS
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: text }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+      },
+    });
+    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+  }
+};
+
+const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {

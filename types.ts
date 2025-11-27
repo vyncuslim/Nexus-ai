@@ -24,12 +24,14 @@ export interface ChatMessage {
 }
 
 export type ModelCategory = 'text' | 'image' | 'video';
+export type AIProvider = 'openai' | 'google';
 
 export interface ModelConfig {
   id: string;
   name: string;
   description: string;
   category: ModelCategory;
+  provider: AIProvider;
   isPro?: boolean;
 }
 

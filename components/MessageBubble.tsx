@@ -8,7 +8,7 @@ interface MessageBubbleProps {
   message: ChatMessage;
 }
 
-const CodeBlock = ({ content }: { content: string }) => {
+const CodeBlock: React.FC<{ content: string }> = ({ content }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {

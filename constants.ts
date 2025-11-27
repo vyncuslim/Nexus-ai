@@ -1,12 +1,14 @@
 import { ModelConfig } from './types';
 
-// Updated to OpenAI Models
+// Combined Models List
 export const GEMINI_MODELS: ModelConfig[] = [
+  // OpenAI Models
   {
     id: 'gpt-3.5-turbo',
     name: 'GPT-3.5 Turbo',
     description: 'Fast. Everyday tasks.',
     category: 'text',
+    provider: 'openai',
     isPro: false
   },
   {
@@ -14,6 +16,7 @@ export const GEMINI_MODELS: ModelConfig[] = [
     name: 'GPT-4o',
     description: 'Smartest. Complex reasoning.',
     category: 'text',
+    provider: 'openai',
     isPro: true
   },
   {
@@ -21,6 +24,40 @@ export const GEMINI_MODELS: ModelConfig[] = [
     name: 'DALL·E 3',
     description: 'Generate high-quality images.',
     category: 'image',
+    provider: 'openai',
+    isPro: true
+  },
+  // Google Gemini Models
+  {
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    description: 'Fast, low latency, versatile.',
+    category: 'text',
+    provider: 'google',
+    isPro: false
+  },
+  {
+    id: 'gemini-3-pro-preview',
+    name: 'Gemini 3 Pro',
+    description: 'Advanced reasoning & coding.',
+    category: 'text',
+    provider: 'google',
+    isPro: true
+  },
+  {
+    id: 'gemini-3-pro-image-preview',
+    name: 'Gemini 3 Image',
+    description: 'Nano Banana Pro generation.',
+    category: 'image',
+    provider: 'google',
+    isPro: true
+  },
+  {
+    id: 'veo-3.1-fast-generate-preview',
+    name: 'Veo Video',
+    description: 'Generate videos (720p).',
+    category: 'video',
+    provider: 'google',
     isPro: true
   }
 ];
@@ -42,12 +79,13 @@ export const UI_TEXT = {
   en: {
     newChat: "New Chat",
     history: "HISTORY",
-    placeholder: "Message ChatGPT...",
+    placeholder: "Type a message...",
     loginTitle: "Invitation Required",
     loginSubtitle: "Enter your access credentials.",
     invitePlaceholder: "Invitation Code (e.g. NEXUS-0001)",
     namePlaceholder: "Your Name",
-    apiKeyPlaceholder: "OpenAI API Key (sk-...)",
+    openaiKeyPlaceholder: "OpenAI API Key (sk-...)",
+    googleKeyPlaceholder: "Google Gemini API Key",
     connectBtn: "Verify & Enter",
     nextBtn: "Next",
     processing: "THINKING",
@@ -56,7 +94,7 @@ export const UI_TEXT = {
     language: "Language / 语言",
     logout: "Exit / Reset",
     welcomeTitle: "Nexus AI",
-    welcomeSubtitle: "Powered by OpenAI",
+    welcomeSubtitle: "Multi-Model Intelligence Hub",
     today: "Today",
     yesterday: "Yesterday",
     previous7Days: "Previous 7 Days",
@@ -78,16 +116,19 @@ export const UI_TEXT = {
     clearChat: "Clear Chat",
     confirmClear: "Clear this conversation?",
     ttsError: "TTS failed.",
+    optional: "(Optional)",
+    keysHelp: "Enter at least one API key to proceed."
   },
   zh: {
     newChat: "新建会话",
     history: "历史记录",
-    placeholder: "发送消息给 ChatGPT...",
+    placeholder: "输入消息...",
     loginTitle: "需要邀请码",
     loginSubtitle: "请输入您的访问凭证。",
     invitePlaceholder: "邀请码 (如 NEXUS-0001)",
     namePlaceholder: "您的名字",
-    apiKeyPlaceholder: "OpenAI API Key (sk-...)",
+    openaiKeyPlaceholder: "OpenAI API Key (sk-...)",
+    googleKeyPlaceholder: "Google Gemini API Key",
     connectBtn: "验证并进入",
     nextBtn: "下一步",
     processing: "思考中",
@@ -96,7 +137,7 @@ export const UI_TEXT = {
     language: "语言 / Language",
     logout: "退出 / 重置",
     welcomeTitle: "Nexus AI",
-    welcomeSubtitle: "由 OpenAI 驱动",
+    welcomeSubtitle: "多模型智能中枢",
     today: "今天",
     yesterday: "昨天",
     previous7Days: "过去 7 天",
@@ -118,5 +159,7 @@ export const UI_TEXT = {
     clearChat: "清空",
     confirmClear: "确定清空当前会话？",
     ttsError: "语音失败。",
+    optional: "(选填)",
+    keysHelp: "请至少输入一个 API 密钥以继续。"
   }
 };
