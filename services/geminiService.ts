@@ -1,150 +1,163 @@
-import { GoogleGenAI, Chat, GenerateContentResponse, Modality } from "@google/genai";
 import { ChatMessage, Role } from "../types";
 
-// Initialize the client strictly using the environment variable as per guidelines
-const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+/**
+ * Service to interact with OpenAI API.
+ * Replaces the previous Gemini implementation.
+ */
+
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_IMAGE_URL = "https://api.openai.com/v1/images/generations";
+const OPENAI_TTS_URL = "https://api.openai.com/v1/audio/speech";
+
+const getHeaders = (apiKey: string) => ({
+  "Content-Type": "application/json",
+  "Authorization": `Bearer ${apiKey}`
+});
 
 /**
- * Creates a chat session and returns a stream of responses (Text).
+ * Streams text response from OpenAI (ChatGPT).
  */
 export const streamGeminiResponse = async (
   modelId: string,
   history: ChatMessage[],
   newMessage: string,
   systemInstruction: string,
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  apiKey?: string
 ): Promise<string> => {
+  if (!apiKey) throw new Error("API Key missing");
+
+  const messages = [
+    { role: "system", content: systemInstruction },
+    ...history.map(m => ({ role: m.role === Role.USER ? "user" : "assistant", content: m.text })),
+    { role: "user", content: newMessage }
+  ];
+
   try {
-    const ai = getAiClient();
-    const chat: Chat = ai.chats.create({
-      model: modelId,
-      config: {
-        systemInstruction: systemInstruction,
-      },
-      history: history.map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.text }]
-      }))
+    const response = await fetch(OPENAI_API_URL, {
+      method: "POST",
+      headers: getHeaders(apiKey),
+      body: JSON.stringify({
+        model: modelId,
+        messages: messages,
+        stream: true
+      })
     });
 
-    const result = await chat.sendMessageStream({ message: newMessage });
-    
-    let fullText = "";
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || "OpenAI API Error");
+    }
 
-    for await (const chunk of result) {
-      const c = chunk as GenerateContentResponse;
-      if (c.text) {
-        fullText += c.text;
-        onChunk(fullText);
+    if (!response.body) throw new Error("No response body");
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let fullText = "";
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+      
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed === "data: [DONE]") break;
+        if (trimmed.startsWith("data: ")) {
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            const content = json.choices[0]?.delta?.content || "";
+            if (content) {
+              fullText += content;
+              onChunk(fullText);
+            }
+          } catch (e) {
+            // Ignore parse errors for partial chunks
+          }
+        }
       }
     }
 
     return fullText;
 
   } catch (error) {
-    console.error("Gemini Text Service Error:", error);
+    console.error("OpenAI Text Service Error:", error);
     throw error;
   }
 };
 
 /**
- * Generates an image using gemini-3-pro-image-preview.
+ * Generates an image using DALL-E 3.
  */
-export const generateImage = async (prompt: string, imageSize: string = "1K"): Promise<string> => {
-  const ai = getAiClient();
-  
-  // Check for Veo/Image specific API key requirements if running in AI Studio context
-  if (typeof window !== 'undefined' && (window as any).aistudio) {
-     const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-     if (!hasKey) {
-       await (window as any).aistudio.openSelectKey();
-       // We must recreate client after selection to pick up new key
-     }
-  }
-  const freshAi = getAiClient();
+export const generateImage = async (prompt: string, imageSize: string = "1024x1024", apiKey?: string): Promise<string> => {
+  if (!apiKey) throw new Error("API Key missing");
 
-  const response = await freshAi.models.generateContent({
-    model: 'gemini-3-pro-image-preview',
-    contents: {
-      parts: [{ text: prompt }],
-    },
-    config: {
-      imageConfig: {
-        aspectRatio: "1:1",
-        imageSize: imageSize
-      },
-    },
+  // OpenAI supports 1024x1024 standard for DALL-E 3
+  const size = "1024x1024"; 
+
+  const response = await fetch(OPENAI_IMAGE_URL, {
+    method: "POST",
+    headers: getHeaders(apiKey),
+    body: JSON.stringify({
+      model: "dall-e-3",
+      prompt: prompt,
+      n: 1,
+      size: size,
+      response_format: "b64_json"
+    })
   });
 
-  for (const part of response.candidates?.[0]?.content?.parts || []) {
-    if (part.inlineData) {
-      const base64EncodeString: string = part.inlineData.data;
-      return `data:image/png;base64,${base64EncodeString}`;
-    }
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error?.message || "Image Gen Error");
   }
-  throw new Error("No image data received");
+
+  const data = await response.json();
+  const b64 = data.data[0].b64_json;
+  return `data:image/png;base64,${b64}`;
 };
 
 /**
- * Generates a video using veo-3.1-fast-generate-preview.
+ * Placeholder for Video - OpenAI doesn't have public Video API yet.
  */
-export const generateVideo = async (prompt: string, aspectRatio: string = "16:9"): Promise<string> => {
-  const ai = getAiClient();
-  
-  if (typeof window !== 'undefined' && (window as any).aistudio) {
-     const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-     if (!hasKey) {
-       await (window as any).aistudio.openSelectKey();
-     }
-  }
-  const freshAi = getAiClient();
+export const generateVideo = async (prompt: string, aspectRatio: string = "16:9", apiKey?: string): Promise<string> => {
+  throw new Error("Video generation is not currently supported by this OpenAI integration.");
+};
 
-  let operation = await freshAi.models.generateVideos({
-    model: 'veo-3.1-fast-generate-preview',
-    prompt: prompt,
-    config: {
-      numberOfVideos: 1,
-      resolution: '720p',
-      aspectRatio: aspectRatio
-    }
+/**
+ * Generates speech using OpenAI TTS.
+ */
+export const generateSpeech = async (text: string, apiKey?: string): Promise<string> => {
+  if (!apiKey) throw new Error("API Key missing");
+
+  const response = await fetch(OPENAI_TTS_URL, {
+    method: "POST",
+    headers: getHeaders(apiKey),
+    body: JSON.stringify({
+      model: "tts-1",
+      input: text,
+      voice: "alloy"
+    })
   });
 
-  // Poll for completion
-  while (!operation.done) {
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    operation = await freshAi.operations.getVideosOperation({operation: operation});
-  }
+  if (!response.ok) throw new Error("TTS Error");
 
-  const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-  if (!downloadLink) throw new Error("Video generation failed");
-
-  // Fetch the actual video bytes using the key
-  const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
   const blob = await response.blob();
-  return URL.createObjectURL(blob);
-};
-
-/**
- * Generates speech using gemini-2.5-flash-preview-tts.
- */
-export const generateSpeech = async (text: string): Promise<string> => {
-  const ai = getAiClient();
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text }] }],
-    config: {
-      responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: 'Kore' },
-        },
-      },
-    },
+  
+  // Convert blob to base64
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
   });
-
-  const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  if (!audioData) {
-    throw new Error("No audio data received");
-  }
-  return audioData;
 };

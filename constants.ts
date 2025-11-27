@@ -1,124 +1,122 @@
 import { ModelConfig } from './types';
 
+// Updated to OpenAI Models
 export const GEMINI_MODELS: ModelConfig[] = [
   {
-    id: 'gemini-2.5-flash',
-    name: 'Nexus Flash',
-    description: 'Fast. Best for everyday tasks.',
+    id: 'gpt-3.5-turbo',
+    name: 'GPT-3.5 Turbo',
+    description: 'Fast. Everyday tasks.',
     category: 'text',
     isPro: false
   },
   {
-    id: 'gemini-3-pro-preview',
-    name: 'Nexus Pro',
-    description: 'Smart. Best for coding & complex logic.',
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    description: 'Smartest. Complex reasoning.',
     category: 'text',
     isPro: true
   },
   {
-    id: 'gemini-3-pro-image-preview',
-    name: 'Nexus Vision',
-    description: 'Create high-quality images.',
+    id: 'dall-e-3',
+    name: 'DALL·E 3',
+    description: 'Generate high-quality images.',
     category: 'image',
-    isPro: true
-  },
-  {
-    id: 'veo-3.1-fast-generate-preview',
-    name: 'Nexus Veo',
-    description: 'Create short videos.',
-    category: 'video',
     isPro: true
   }
 ];
 
-export const SYSTEM_INSTRUCTION_EN = `You are Nexus, a sophisticated AI assistant and the core intelligence of a cross-platform product matrix. 
-Your goal is to be helpful, precise, and concise. 
-Use Markdown for formatting code and structured text.`;
+// Helper to validate invite codes (NEXUS-0001 to NEXUS-1000)
+export const validateInviteCode = (code: string): boolean => {
+  const pattern = /^NEXUS-(\d{4})$/;
+  const match = code.toUpperCase().match(pattern);
+  if (!match) return false;
+  const num = parseInt(match[1], 10);
+  return num >= 1 && num <= 1000;
+};
 
-export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus (核心)，一个跨平台产品矩阵的核心人工智能助手。
-你的目标是提供有用、精准且简洁的回答。
-请务必使用中文进行思考和回答，除非用户明确要求使用其他语言。
-使用 Markdown 格式化代码和结构化文本。`;
+export const SYSTEM_INSTRUCTION_EN = `You are Nexus, a helpful AI assistant. Use Markdown for formatting code.`;
+
+export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus，一个有用的人工智能助手。请使用 Markdown 格式化代码。`;
 
 export const UI_TEXT = {
   en: {
-    newChat: "New Conversation",
-    history: "MEMORY LOGS",
-    placeholder: "Transmit to Nexus Core...",
-    loginTitle: "Nexus Core Access",
-    loginSubtitle: "Authenticate to access neural network",
-    emailPlaceholder: "Access ID (Email or Phone)",
-    namePlaceholder: "Display Name",
-    connectBtn: "Initialize Connection",
-    createBtn: "Create Neural Link",
-    processing: "PROCESSING",
-    generatingVideo: "RENDERING VIDEO STREAM...",
-    ready: "SYSTEM READY",
+    newChat: "New Chat",
+    history: "HISTORY",
+    placeholder: "Message ChatGPT...",
+    loginTitle: "Invitation Required",
+    loginSubtitle: "Enter your access credentials.",
+    invitePlaceholder: "Invitation Code (e.g. NEXUS-0001)",
+    namePlaceholder: "Your Name",
+    apiKeyPlaceholder: "OpenAI API Key (sk-...)",
+    connectBtn: "Verify & Enter",
+    nextBtn: "Next",
+    processing: "THINKING",
+    generatingVideo: "GENERATING...",
+    ready: "READY",
     language: "Language / 语言",
-    logout: "Terminate Session",
-    welcomeTitle: "Nexus Core Online",
-    welcomeSubtitle: "Select a frequency to begin transmission.",
+    logout: "Exit / Reset",
+    welcomeTitle: "Nexus AI",
+    welcomeSubtitle: "Powered by OpenAI",
     today: "Today",
     yesterday: "Yesterday",
     previous7Days: "Previous 7 Days",
     older: "Older",
-    signIn: "Sign In",
-    signUp: "Sign Up",
-    welcomeBack: "Welcome back, Commander.",
-    joinNexus: "Initialize new identity.",
-    authErrorUserNotFound: "Identity not found. Please register.",
-    authErrorUserExists: "Identity already registered. Please sign in.",
-    authErrorGeneric: "Authentication failed.",
+    signIn: "Enter",
+    signUp: "Join",
+    welcomeBack: "Welcome",
+    joinNexus: "Initialize",
+    authErrorInvalidCode: "Invalid Invitation Code.",
+    authErrorGeneric: "Verification failed.",
     uploadPhoto: "Upload Photo",
     takePhoto: "Take Photo",
     cancel: "Cancel",
     save: "Save",
-    profile: "User Profile",
-    promptPlaceholderImage: "Describe the image to generate...",
-    promptPlaceholderVideo: "Describe the video to generate...",
+    profile: "Profile",
+    promptPlaceholderImage: "Describe the image...",
+    promptPlaceholderVideo: "Describe the video...",
     summarize: "Summarize",
-    clearChat: "Clear Context",
-    confirmClear: "Are you sure you want to clear all messages in this session?",
-    ttsError: "Failed to generate speech.",
+    clearChat: "Clear Chat",
+    confirmClear: "Clear this conversation?",
+    ttsError: "TTS failed.",
   },
   zh: {
     newChat: "新建会话",
-    history: "记忆档案",
-    placeholder: "向 Nexus 核心发送指令...",
-    loginTitle: "Nexus 核心接入",
-    loginSubtitle: "验证身份以连接神经网络",
-    emailPlaceholder: "访问 ID (邮箱或手机号)",
-    namePlaceholder: "显示名称",
-    connectBtn: "初始化连接",
-    createBtn: "建立神经链接",
-    processing: "核心运算中",
-    generatingVideo: "视频流渲染中...",
-    ready: "系统就绪",
+    history: "历史记录",
+    placeholder: "发送消息给 ChatGPT...",
+    loginTitle: "需要邀请码",
+    loginSubtitle: "请输入您的访问凭证。",
+    invitePlaceholder: "邀请码 (如 NEXUS-0001)",
+    namePlaceholder: "您的名字",
+    apiKeyPlaceholder: "OpenAI API Key (sk-...)",
+    connectBtn: "验证并进入",
+    nextBtn: "下一步",
+    processing: "思考中",
+    generatingVideo: "生成中...",
+    ready: "就绪",
     language: "语言 / Language",
-    logout: "断开连接",
-    welcomeTitle: "Nexus 核心已上线",
-    welcomeSubtitle: "请选择一个频段开始传输。",
+    logout: "退出 / 重置",
+    welcomeTitle: "Nexus AI",
+    welcomeSubtitle: "由 OpenAI 驱动",
     today: "今天",
     yesterday: "昨天",
     previous7Days: "过去 7 天",
     older: "更早",
-    signIn: "登录",
-    signUp: "注册",
-    welcomeBack: "欢迎回来，指挥官。",
-    joinNexus: "初始化新身份。",
-    authErrorUserNotFound: "未找到该身份，请先注册。",
-    authErrorUserExists: "该身份已存在，请直接登录。",
+    signIn: "进入",
+    signUp: "加入",
+    welcomeBack: "欢迎",
+    joinNexus: "初始化",
+    authErrorInvalidCode: "邀请码无效。",
     authErrorGeneric: "验证失败。",
     uploadPhoto: "上传照片",
     takePhoto: "拍摄照片",
     cancel: "取消",
     save: "保存",
-    profile: "用户档案",
-    promptPlaceholderImage: "描述您想生成的图像...",
-    promptPlaceholderVideo: "描述您想生成的视频...",
+    profile: "个人资料",
+    promptPlaceholderImage: "描述图像...",
+    promptPlaceholderVideo: "描述视频...",
     summarize: "生成摘要",
-    clearChat: "清空上下文",
-    confirmClear: "您确定要清空当前会话的所有消息吗？",
-    ttsError: "语音生成失败。",
+    clearChat: "清空",
+    confirmClear: "确定清空当前会话？",
+    ttsError: "语音失败。",
   }
 };

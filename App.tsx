@@ -11,13 +11,15 @@ import { v4 as uuidv4 } from 'uuid';
 
 function App() {
   // --- Persistent State Keys ---
-  const STORAGE_KEY_USER = 'nexus_auth_user';
-  const STORAGE_KEY_USERS_DB = 'nexus_users_db';
+  const STORAGE_KEY_USER = 'nexus_user_v2';
+  const STORAGE_KEY_API_KEY = 'nexus_api_key';
+  const STORAGE_KEY_INVITE_CODE = 'nexus_invite_code';
   const STORAGE_KEY_SESSIONS_PREFIX = 'nexus_sessions_';
   const STORAGE_KEY_PREFS = 'nexus_preferences';
 
   // --- State ---
   const [user, setUser] = useState<User | null>(null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
   const [language, setLanguage] = useState<Language>('en');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
@@ -31,8 +33,6 @@ function App() {
   // Undo/Redo History for Input
   const inputControl = useHistory<string>("");
   const inputValue = inputControl.state;
-  // Custom setter for debounced history saving? For now, we save on blur or pause, or just simple set.
-  // To avoid history spam, we can just use it directly, assuming user wants granular undo.
   const setInputValue = inputControl.set;
 
   const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +46,6 @@ function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const inputTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- Load Initial State ---
   useEffect(() => {
@@ -59,12 +58,16 @@ function App() {
       } catch (e) { console.error(e); }
     }
 
-    // Load User
+    // Load Auth
     const storedUser = localStorage.getItem(STORAGE_KEY_USER);
-    if (storedUser) {
+    const storedKey = localStorage.getItem(STORAGE_KEY_API_KEY);
+    const storedInvite = localStorage.getItem(STORAGE_KEY_INVITE_CODE);
+
+    if (storedUser && storedKey && storedInvite) {
       try {
         const u = JSON.parse(storedUser);
         setUser(u);
+        setApiKey(storedKey);
         loadSessions(u.id);
       } catch (e) { console.error(e); }
     }
@@ -75,7 +78,7 @@ function App() {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isLoading) {
         e.preventDefault();
-        e.returnValue = ''; // Standard for Chrome
+        e.returnValue = ''; 
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -93,7 +96,7 @@ function App() {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [user, sessions]); // Deps needed for createNewSession context
+  }, [user, sessions]); 
 
   // --- Session Management Helpers ---
   const loadSessions = (userId: string) => {
@@ -101,11 +104,8 @@ function App() {
     if (storedSessions) {
       try {
         const s: ChatSession[] = JSON.parse(storedSessions);
-        // Sort by updated at desc
         s.sort((a, b) => b.updatedAt - a.updatedAt);
-        // We use skipHistory=true for initial load
         setSessions(s, true);
-        // If sessions exist, open the most recent
         if (s.length > 0) {
           setCurrentSessionId(s[0].id);
         }
@@ -122,7 +122,7 @@ function App() {
     try {
       localStorage.setItem(STORAGE_KEY_SESSIONS_PREFIX + userId, JSON.stringify(updatedSessions));
     } catch (e) {
-      console.error("Storage limit reached or error saving sessions", e);
+      console.error("Storage limit reached", e);
     }
   };
 
@@ -138,12 +138,12 @@ function App() {
     const updatedSessions = [newSession, ...sessions];
     setSessions(updatedSessions);
     setCurrentSessionId(newSession.id);
-    setSidebarOpen(false); // Close sidebar on mobile
+    setSidebarOpen(false); 
     saveSessionsToStorage(updatedSessions, user.id);
   };
 
   const deleteSession = (sessionId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent selection
+    e.stopPropagation(); 
     if (!user) return;
     const updatedSessions = sessions.filter(s => s.id !== sessionId);
     setSessions(updatedSessions);
@@ -169,46 +169,23 @@ function App() {
     setShowClearConfirm(false);
   };
 
-  // --- Authentication & User Logic ---
-  const handleAuth = (email: string, isLoginMode: boolean, name?: string): string | null => {
-    let usersDb: Record<string, User> = {};
-    try {
-      const usersDbStr = localStorage.getItem(STORAGE_KEY_USERS_DB);
-      if (usersDbStr) usersDb = JSON.parse(usersDbStr);
-    } catch (e) {
-      console.error("Error loading user DB", e);
-    }
-    
-    const userId = btoa(email.toLowerCase().trim()); // Simple ID generation
-    
-    if (isLoginMode) {
-      if (usersDb[userId]) {
-        const finalUser = usersDb[userId];
-        setUser(finalUser);
-        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(finalUser));
-        loadSessions(finalUser.id);
-        return null;
-      } else {
-        return language === 'zh' ? UI_TEXT.zh.authErrorUserNotFound : UI_TEXT.en.authErrorUserNotFound;
-      }
-    } else {
-      if (usersDb[userId]) {
-        return language === 'zh' ? UI_TEXT.zh.authErrorUserExists : UI_TEXT.en.authErrorUserExists;
-      } else {
-        if (!name) return "Name required";
-        const finalUser = { id: userId, email, name };
-        usersDb[userId] = finalUser;
-        
-        try {
-          localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDb));
-        } catch (e) { console.error("Error saving user DB", e); }
+  // --- Authentication Logic ---
+  const handleAuthSuccess = (inviteCode: string, name: string, key: string) => {
+    // Generate simple User object
+    const u: User = {
+      id: btoa(inviteCode + name), // Simple ID
+      name: name,
+      email: inviteCode // Storing code as email for display
+    };
 
-        setUser(finalUser);
-        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(finalUser));
-        loadSessions(finalUser.id);
-        return null;
-      }
-    }
+    setUser(u);
+    setApiKey(key);
+    
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(u));
+    localStorage.setItem(STORAGE_KEY_API_KEY, key);
+    localStorage.setItem(STORAGE_KEY_INVITE_CODE, inviteCode);
+    
+    loadSessions(u.id);
   };
 
   const updateUserAvatar = (avatarBase64: string) => {
@@ -216,23 +193,19 @@ function App() {
     const updatedUser = { ...user, avatar: avatarBase64 };
     setUser(updatedUser);
     localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
-    
-    // Update DB
-    try {
-      const usersDbStr = localStorage.getItem(STORAGE_KEY_USERS_DB);
-      if (usersDbStr) {
-        const usersDb = JSON.parse(usersDbStr);
-        usersDb[user.id] = updatedUser;
-        localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(usersDb));
-      }
-    } catch (e) { console.error(e); }
   };
 
   const handleLogout = () => {
     setUser(null);
+    setApiKey(null);
     setSessions([], true);
     setCurrentSessionId(null);
+    
+    // Clear all auth data
     localStorage.removeItem(STORAGE_KEY_USER);
+    localStorage.removeItem(STORAGE_KEY_API_KEY);
+    localStorage.removeItem(STORAGE_KEY_INVITE_CODE);
+    
     setSidebarOpen(false);
   };
 
@@ -263,9 +236,7 @@ function App() {
     }
   }, [inputValue]);
 
-  // --- Markdown & Input Handling ---
-  
-  // Generic wrapper function that handles selection
+  // Markdown Selection Helper
   const wrapSelection = (prefix: string, suffix: string, defaultText: string = "text") => {
     if (!textareaRef.current) return;
     
@@ -273,7 +244,6 @@ function App() {
     const end = textareaRef.current.selectionEnd;
     const text = inputValue;
     
-    // Check if something is selected
     const hasSelection = start !== end;
     const selected = hasSelection ? text.substring(start, end) : defaultText;
     
@@ -284,14 +254,11 @@ function App() {
     setInputValue(newText);
     textareaRef.current.focus();
     
-    // Set cursor position
     setTimeout(() => {
         if(!textareaRef.current) return;
         if (hasSelection) {
-            // If text was selected, select the wrapped text
             textareaRef.current.setSelectionRange(start, start + prefix.length + selected.length + suffix.length);
         } else {
-            // If no text was selected, place cursor between tags (or at end of default)
             const cursor = start + prefix.length + selected.length;
             textareaRef.current.setSelectionRange(cursor, cursor);
         }
@@ -299,12 +266,11 @@ function App() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setInputValue(val);
+    setInputValue(e.target.value);
   };
 
   const handleSummarize = async () => {
-    if (!currentSessionId || isLoading || !user) return;
+    if (!currentSessionId || isLoading || !user || !apiKey) return;
     const msgs = getCurrentMessages();
     if (msgs.length === 0) return;
 
@@ -313,15 +279,13 @@ function App() {
       ? "请简洁总结以下对话：" 
       : "Please summarize the following conversation concisely:";
     
-    // Create text representation of history
     const context = msgs.map(m => `${m.role}: ${m.text}`).join('\n');
     const fullPrompt = `${summaryPrompt}\n\n${context}`;
 
-    // Add model placeholder
     const targetSessionId = currentSessionId;
     const modelMsgId = uuidv4();
     
-    // Update State to show Loading Bubble
+    // Placeholder
     const initialModelMsg: ChatMessage = {
       id: modelMsgId,
       role: Role.MODEL,
@@ -339,7 +303,7 @@ function App() {
 
     try {
       const summary = await streamGeminiResponse(
-        'gemini-2.5-flash', // Use Flash for summary
+        'gpt-3.5-turbo', 
         [],
         fullPrompt,
         language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN,
@@ -351,10 +315,10 @@ function App() {
                if (m) m.text = text;
                return news;
             }, true);
-        }
+        },
+        apiKey
       );
       
-      // Final Update
       const finalSessions = sessions.map(s => {
           if (s.id === targetSessionId) {
             const ms = s.messages.map(m => m.id === modelMsgId ? { ...m, text: summary } : m);
@@ -367,7 +331,6 @@ function App() {
 
     } catch (e) {
       console.error(e);
-      // Remove loading bubble on error
        const revertedSessions = sessions.map(s => {
         if (s.id === targetSessionId) {
           return { ...s, messages: s.messages.filter(m => m.id !== modelMsgId) };
@@ -381,10 +344,9 @@ function App() {
   };
 
   const handleSendMessage = useCallback(async () => {
-    if (!inputValue.trim() || isLoading || !user) return;
+    if (!inputValue.trim() || isLoading || !user || !apiKey) return;
     
     const currentUserId = user.id;
-    const currentUserName = user.name;
     let targetSessionId = currentSessionId;
     let targetSession = sessions.find(s => s.id === targetSessionId);
     let updatedSessions = [...sessions];
@@ -407,7 +369,6 @@ function App() {
     setInputValue(""); 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
-    // 1. User Message
     const userMsg: ChatMessage = {
       id: uuidv4(),
       role: Role.USER,
@@ -418,7 +379,6 @@ function App() {
     targetSession.messages.push(userMsg);
     targetSession.updatedAt = Date.now();
     
-    // Sort and Save
     updatedSessions = updatedSessions.filter(s => s.id !== targetSessionId);
     updatedSessions.unshift(targetSession);
     setSessions([...updatedSessions]);
@@ -426,34 +386,23 @@ function App() {
     
     setIsLoading(true);
 
-    // 2. Determine Action based on Model Category
     try {
       if (selectedModel.category === 'image') {
-        // --- Image Generation ---
-        const imageUrl = await generateImage(userText, imageSize);
+        const imageUrl = await generateImage(userText, imageSize, apiKey);
         const modelMsg: ChatMessage = {
           id: uuidv4(),
           role: Role.MODEL,
-          text: language === 'zh' ? `图像生成完毕 (${imageSize})。` : `Image generated successfully (${imageSize}).`,
+          text: language === 'zh' ? `图像生成完毕。` : `Image generated successfully.`,
           attachment: { type: 'image', url: imageUrl },
           timestamp: Date.now()
         };
         targetSession.messages.push(modelMsg);
 
       } else if (selectedModel.category === 'video') {
-        // --- Video Generation ---
-        const videoUrl = await generateVideo(userText, videoAspectRatio);
-        const modelMsg: ChatMessage = {
-          id: uuidv4(),
-          role: Role.MODEL,
-          text: language === 'zh' ? `视频生成完毕 (${videoAspectRatio})。` : `Video generated successfully (${videoAspectRatio}).`,
-          attachment: { type: 'video', url: videoUrl },
-          timestamp: Date.now()
-        };
-        targetSession.messages.push(modelMsg);
+        // Video disabled in this version
+        throw new Error("Video generation is not supported in this version.");
 
       } else {
-        // --- Standard Text Chat ---
         const modelMsgId = uuidv4();
         const initialModelMsg: ChatMessage = {
           id: modelMsgId,
@@ -462,17 +411,15 @@ function App() {
           timestamp: Date.now()
         };
         targetSession.messages.push(initialModelMsg);
-        setSessions([...updatedSessions]); // Render placeholder
+        setSessions([...updatedSessions]);
         
-        const systemInstructionWithMemory = language === 'zh'
-          ? `${SYSTEM_INSTRUCTION_ZH}\n\n当前用户名称: ${currentUserName}。`
-          : `${SYSTEM_INSTRUCTION_EN}\n\nCurrent User Name: ${currentUserName}.`;
+        const systemInstruction = language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN;
 
         const finalResponseText = await streamGeminiResponse(
           selectedModel.id,
           targetSession.messages.slice(0, -1),
           userText,
-          systemInstructionWithMemory,
+          systemInstruction,
           (currentFullText) => {
             setSessions((prev) => {
                const news = [...prev];
@@ -480,15 +427,14 @@ function App() {
                const m = s?.messages.find(msg => msg.id === modelMsgId);
                if (m) m.text = currentFullText;
                return news;
-            }, true); // Skip history for streaming updates to avoid pollution
-          }
+            }, true);
+          },
+          apiKey
         );
-        // Ensure final state matches
         const finalMsg = targetSession.messages.find(m => m.id === modelMsgId);
         if (finalMsg) finalMsg.text = finalResponseText;
       }
       
-      // Success Save
       saveSessionsToStorage(updatedSessions, currentUserId);
 
     } catch (error: any) {
@@ -496,7 +442,7 @@ function App() {
       const errorMsg: ChatMessage = {
         id: uuidv4(),
         role: Role.MODEL,
-        text: language === 'zh' ? `错误：${error.message || "请求失败"}` : `Error: ${error.message || "Request failed"}`,
+        text: language === 'zh' ? `错误：${error.message}` : `Error: ${error.message}`,
         isError: true,
         timestamp: Date.now()
       };
@@ -506,7 +452,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, language, imageSize, videoAspectRatio, setSessions, setInputValue]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, apiKey, language, imageSize, videoAspectRatio, setSessions, setInputValue]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -523,21 +469,15 @@ function App() {
 
   const t = UI_TEXT[language];
 
-  if (!user) {
-    return <AuthScreen onAuth={handleAuth} language={language} />;
+  if (!user || !apiKey) {
+    return <AuthScreen onAuthSuccess={handleAuthSuccess} language={language} />;
   }
 
   const activeMessages = getCurrentMessages();
 
-  // Helper text for input based on model
-  let inputPlaceholder = t.placeholder;
-  if (selectedModel.category === 'image') inputPlaceholder = t.promptPlaceholderImage;
-  if (selectedModel.category === 'video') inputPlaceholder = t.promptPlaceholderVideo;
-
   return (
     <div className="flex h-screen bg-nexus-900 text-slate-200 font-sans overflow-hidden">
       
-      {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm"
@@ -545,10 +485,9 @@ function App() {
         />
       )}
 
-      {/* Confirmation Dialog */}
       {showClearConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-nexus-800 border border-nexus-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full transform transition-all scale-100">
+          <div className="bg-nexus-800 border border-nexus-700 p-6 rounded-2xl shadow-2xl max-w-sm w-full">
             <h3 className="text-lg font-bold text-white mb-2">{t.clearChat}?</h3>
             <p className="text-sm text-gray-400 mb-6">{t.confirmClear}</p>
             <div className="flex justify-end gap-3">
@@ -560,7 +499,7 @@ function App() {
               </button>
               <button 
                 onClick={clearCurrentChat}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors shadow-lg shadow-red-500/20"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors"
               >
                 {t.clearChat}
               </button>
@@ -569,7 +508,6 @@ function App() {
         </div>
       )}
 
-      {/* Sidebar Component */}
       <Sidebar 
         isOpen={sidebarOpen} 
         sessions={sessions}
@@ -584,10 +522,8 @@ function App() {
         onToggleLanguage={toggleLanguage}
       />
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col relative w-full h-full transition-all">
         
-        {/* Header */}
         <header className="h-16 border-b border-nexus-700 flex items-center justify-between px-4 bg-nexus-900/80 backdrop-blur-md z-20 sticky top-0">
           <div className="flex items-center gap-3">
             <button 
@@ -597,7 +533,6 @@ function App() {
               <MenuIcon />
             </button>
             
-            {/* Model Selector */}
             <div className="relative">
               <button 
                 onClick={() => setModelMenuOpen(!modelMenuOpen)}
@@ -605,14 +540,14 @@ function App() {
               >
                 {selectedModel.category === 'image' && <ImageIcon />}
                 {selectedModel.category === 'video' && <VideoIcon />}
-                <span className={selectedModel.isPro ? "text-purple-400" : "text-nexus-accent"}>
+                <span className={selectedModel.isPro ? "text-purple-400" : "text-emerald-400"}>
                   {selectedModel.name}
                 </span>
                 <ChevronDownIcon />
               </button>
 
               {modelMenuOpen && (
-                <div className="absolute top-full left-0 mt-2 w-80 bg-nexus-800 border border-nexus-700 rounded-xl shadow-2xl p-2 z-50 max-h-[80vh] overflow-y-auto">
+                <div className="absolute top-full left-0 mt-2 w-80 bg-nexus-800 border border-nexus-700 rounded-xl shadow-2xl p-2 z-50">
                   {GEMINI_MODELS.map(model => (
                     <button
                       key={model.id}
@@ -623,13 +558,12 @@ function App() {
                       className={`w-full text-left px-4 py-3 rounded-lg text-sm mb-1 transition-colors ${selectedModel.id === model.id ? 'bg-nexus-700' : 'hover:bg-nexus-700/50'}`}
                     >
                       <div className="flex items-center gap-2">
-                        {model.category === 'image' && <ImageIcon />}
-                        {model.category === 'video' && <VideoIcon />}
-                        <span className={`font-semibold ${model.isPro ? 'text-purple-400' : 'text-nexus-accent'}`}>
+                         {model.category === 'image' && <ImageIcon />}
+                        <span className={`font-semibold ${model.isPro ? 'text-purple-400' : 'text-emerald-400'}`}>
                            {model.name}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-400 mt-1 leading-relaxed">
+                      <div className="text-xs text-gray-400 mt-1">
                         {model.description}
                       </div>
                     </button>
@@ -641,12 +575,11 @@ function App() {
 
           <div className="flex items-center gap-4">
             
-            {/* Actions for current session */}
             {currentSessionId && activeMessages.length > 0 && !isLoading && (
               <div className="flex items-center gap-1 border-r border-nexus-700 pr-4 mr-1">
                  <button 
                    onClick={handleSummarize}
-                   className="p-2 text-gray-400 hover:text-nexus-accent hover:bg-nexus-800 rounded-lg transition-colors"
+                   className="p-2 text-gray-400 hover:text-emerald-400 hover:bg-nexus-800 rounded-lg transition-colors"
                    title={t.summarize}
                  >
                    <SparklesIcon />
@@ -661,7 +594,6 @@ function App() {
               </div>
             )}
 
-            {/* Status Indicator */}
             <div className="flex items-center gap-2 px-3 py-1 bg-nexus-800 rounded-full border border-nexus-700">
               {isLoading ? (
                 <>
@@ -670,7 +602,7 @@ function App() {
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                   </span>
                   <span className="text-[10px] font-mono text-amber-500 tracking-wider">
-                    {selectedModel.category === 'video' ? t.generatingVideo : t.processing}
+                    {t.processing}
                   </span>
                 </>
               ) : (
@@ -683,19 +615,13 @@ function App() {
           </div>
         </header>
 
-        {/* Chat Area */}
         <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8 custom-scrollbar scroll-smooth">
           <div className="max-w-3xl mx-auto min-h-full flex flex-col">
-            
             {activeMessages.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center opacity-40 select-none">
-                <div className="w-20 h-20 bg-gradient-to-tr from-nexus-accent to-purple-600 rounded-2xl mb-6 shadow-[0_0_30px_rgba(59,130,246,0.3)] animate-pulse-slow"></div>
+                <div className="w-20 h-20 bg-gradient-to-tr from-emerald-500 to-teal-600 rounded-2xl mb-6 shadow-2xl animate-pulse-slow"></div>
                 <h1 className="text-3xl font-bold mb-2 text-white">{t.welcomeTitle}</h1>
-                <p className="text-nexus-accent text-center">{t.welcomeSubtitle}</p>
-                <div className="mt-8 grid grid-cols-2 gap-4 max-w-md">
-                   <div className="bg-nexus-800 p-3 rounded text-xs text-gray-400 text-center">Alt + N <br/> New Chat</div>
-                   <div className="bg-nexus-800 p-3 rounded text-xs text-gray-400 text-center">Ctrl + Enter <br/> New Line</div>
-                </div>
+                <p className="text-emerald-400 text-center">{t.welcomeSubtitle}</p>
               </div>
             ) : (
               <div className="space-y-6 pb-4">
@@ -708,81 +634,30 @@ function App() {
           </div>
         </div>
 
-        {/* Input Area */}
         <div className="p-4 bg-nexus-900 border-t border-nexus-700">
           <div className="max-w-3xl mx-auto relative group">
             
-            {/* Toolbar (Markdown + Media Config) */}
             <div className="flex items-center justify-between mb-2 px-1">
-              
-              {/* Left: Markdown Tools & Undo/Redo */}
               <div className="flex items-center gap-1">
-                <button onClick={() => wrapSelection('**', '**', 'bold text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Bold"><BoldIcon /></button>
-                <button onClick={() => wrapSelection('_', '_', 'italic text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Italic"><ItalicIcon /></button>
-                <button onClick={() => wrapSelection('`', '`', 'code')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Inline Code"><CodeIcon /></button>
-                <button onClick={() => wrapSelection('```\n', '\n```', 'code block')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Code Block">
-                   <div className="scale-75"><CodeIcon /></div>
-                </button>
-                <button onClick={() => wrapSelection('[', '](url)', 'link text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Link"><LinkIcon /></button>
-                
+                <button onClick={() => wrapSelection('**', '**', 'bold text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors"><BoldIcon /></button>
+                <button onClick={() => wrapSelection('_', '_', 'italic text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors"><ItalicIcon /></button>
+                <button onClick={() => wrapSelection('`', '`', 'code')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors"><CodeIcon /></button>
+                <button onClick={() => wrapSelection('```\n', '\n```', 'code block')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors"><div className="scale-75"><CodeIcon /></div></button>
+                <button onClick={() => wrapSelection('[', '](url)', 'link text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors"><LinkIcon /></button>
                 <div className="w-px h-4 bg-nexus-700 mx-2"></div>
-                
-                <button 
-                   onClick={inputControl.undo} 
-                   disabled={!inputControl.canUndo}
-                   className={`p-1.5 rounded transition-colors ${inputControl.canUndo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}
-                >
-                   <UndoIcon />
-                </button>
-                <button 
-                   onClick={inputControl.redo} 
-                   disabled={!inputControl.canRedo}
-                   className={`p-1.5 rounded transition-colors ${inputControl.canRedo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}
-                >
-                   <RedoIcon />
-                </button>
+                <button onClick={inputControl.undo} disabled={!inputControl.canUndo} className={`p-1.5 rounded transition-colors ${inputControl.canUndo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}><UndoIcon /></button>
+                <button onClick={inputControl.redo} disabled={!inputControl.canRedo} className={`p-1.5 rounded transition-colors ${inputControl.canRedo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`}><RedoIcon /></button>
               </div>
-
-              {/* Right: Model Specific Options */}
-              {selectedModel.category === 'image' && (
-                <div className="flex items-center gap-1 bg-nexus-800 rounded-lg p-0.5 border border-nexus-700">
-                   {["1K", "2K", "4K"].map(size => (
-                      <button
-                        key={size}
-                        onClick={() => setImageSize(size)}
-                        className={`text-[10px] px-2 py-1 rounded-md transition-all ${imageSize === size ? 'bg-nexus-700 text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}
-                      >
-                        {size}
-                      </button>
-                   ))}
-                </div>
-              )}
-
-              {selectedModel.category === 'video' && (
-                <div className="flex items-center gap-1 bg-nexus-800 rounded-lg p-0.5 border border-nexus-700">
-                   {["16:9", "9:16"].map(ratio => (
-                      <button
-                        key={ratio}
-                        onClick={() => setVideoAspectRatio(ratio)}
-                        className={`text-[10px] px-2 py-1 rounded-md transition-all ${videoAspectRatio === ratio ? 'bg-nexus-700 text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}
-                      >
-                        {ratio}
-                      </button>
-                   ))}
-                </div>
-              )}
-
             </div>
 
-            {/* Styled Input Container with Glassmorphism and Focus effects */}
-            <div className="relative rounded-2xl bg-nexus-800/80 backdrop-blur-sm border border-nexus-700 shadow-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-nexus-accent/50 focus-within:border-nexus-accent focus-within:shadow-lg focus-within:bg-nexus-800">
+            <div className="relative rounded-2xl bg-nexus-800/80 backdrop-blur-sm border border-nexus-700 shadow-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-emerald-500/50 focus-within:border-emerald-500 focus-within:shadow-lg focus-within:bg-nexus-800">
                 <textarea
                 ref={textareaRef}
                 rows={1}
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder={inputPlaceholder}
+                placeholder={t.placeholder}
                 className="w-full bg-transparent text-white placeholder-gray-500 rounded-2xl pl-5 pr-14 py-4 focus:outline-none resize-none overflow-hidden text-base font-sans"
                 />
                 
@@ -792,19 +667,13 @@ function App() {
                 className={`
                     absolute right-2 bottom-2 p-2.5 rounded-xl transition-all duration-300 transform
                     ${inputValue.trim() && !isLoading 
-                    ? 'bg-nexus-accent text-white hover:bg-nexus-accentHover shadow-md hover:scale-105' 
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-md hover:scale-105' 
                     : 'bg-nexus-700/50 text-gray-500 cursor-not-allowed'}
                 `}
                 >
                 <SendIcon />
                 </button>
             </div>
-          </div>
-          <div className="text-center mt-3 flex justify-center items-center gap-2 opacity-60">
-            <ActivityIcon />
-            <span className="text-[10px] text-gray-500 font-mono tracking-wider">
-              NEXUS CORE SYSTEM V2.2 // {selectedModel.name.toUpperCase()}
-            </span>
           </div>
         </div>
 
