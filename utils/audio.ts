@@ -61,6 +61,7 @@ export const playAudioContent = async (base64Audio: string): Promise<AudioBuffer
   } catch (e) {
     // 2. Fallback to Manual PCM Decode (Works for Gemini Raw Audio)
     // Gemini returns raw PCM 24kHz which native decodeAudioData often fails on
+    // console.log("Native decode failed, attempting PCM decode...", e);
     audioBuffer = await decodePCM(arrayBuffer, ctx);
   }
   

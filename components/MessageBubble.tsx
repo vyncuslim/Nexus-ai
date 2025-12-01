@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, Role, AIProvider } from '../types';
-import { RobotIcon, UserIcon, CopyIcon, CheckIcon, SpeakerIcon, StopIcon } from './Icon';
+import { RobotIcon, UserIcon, CopyIcon, CheckIcon, SpeakerIcon, StopIcon, XIcon } from './Icon';
 import { generateSpeech } from '../services/geminiService';
 import { playAudioContent } from '../utils/audio';
 
@@ -49,6 +49,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
   const isError = message.isError;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [ttsError, setTtsError] = useState(false);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   // Stop audio if component unmounts
@@ -61,6 +62,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
   }, []);
 
   const toggleSpeech = async () => {
+    // Reset error state on new attempt
+    setTtsError(false);
+
     if (isSpeaking) {
       if (audioSourceRef.current) {
         try { audioSourceRef.current.stop(); } catch(e) {}
@@ -92,6 +96,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
 
     } catch (err) {
       console.error("TTS Error", err);
+      setTtsError(true);
+      // clear error visual after 3 seconds
+      setTimeout(() => setTtsError(false), 3000);
     } finally {
       setIsLoadingAudio(false);
     }
@@ -105,7 +112,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
     // 3. Raw URLs: http...
     // 4. Bold: **text**
     // 5. Inline code: `text`
-    // Fixed Regex: Removed inner capturing groups to avoid duplication in split result
     const parts = text.split(/(```[\s\S]*?```|\[.*?\]\(.*?\)|https?:\/\/[^\s]+|\*\*.*?\*\*|`.*?`)/g);
     
     return (
@@ -117,7 +123,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
                 if (part.startsWith('```') && part.endsWith('```')) {
                     let content = part.slice(3, -3);
                     // Attempt to strip language identifier (e.g. "javascript\n")
-                    // If the first line is a single word (no spaces), remove it
                     content = content.replace(/^[a-zA-Z0-9+#]+\n/, ''); 
                     return <CodeBlock key={i} content={content.trim()} />;
                 }
@@ -185,13 +190,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
                    onClick={toggleSpeech}
                    disabled={isLoadingAudio}
                    className={`
-                     p-1 rounded transition-colors
-                     ${isSpeaking ? 'text-nexus-accent bg-nexus-900/50' : 'text-gray-500 hover:text-white'}
+                     p-1.5 rounded-md transition-all duration-200
+                     ${ttsError 
+                        ? 'text-red-400 bg-red-900/20' 
+                        : isSpeaking 
+                            ? 'text-nexus-accent bg-nexus-900/50 ring-1 ring-nexus-accent/30' 
+                            : 'text-gray-500 hover:text-white hover:bg-nexus-700'}
                    `}
-                   title={isSpeaking ? "Stop" : "Read Aloud"}
+                   title={ttsError ? "TTS Failed" : isSpeaking ? "Stop" : "Read Aloud"}
                  >
                    {isLoadingAudio ? (
-                     <span className="block w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></span>
+                     <span className="block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+                   ) : ttsError ? (
+                     <XIcon /> 
                    ) : isSpeaking ? (
                      <StopIcon />
                    ) : (

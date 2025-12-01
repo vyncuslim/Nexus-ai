@@ -171,7 +171,7 @@ export const generateImage = async (
     // Gemini Image
     const ai = new GoogleGenAI({ apiKey });
     // Map simplified size to Google config if needed, or default
-    const config = {
+    const config: any = {
       imageConfig: { imageSize: "1K" } // forcing 1K for now as 2K/4K is specific to Pro
     };
     if (imageSize === "2K") config.imageConfig.imageSize = "2K";
@@ -244,6 +244,7 @@ export const generateSpeech = async (text: string, apiKey?: string, provider: AI
       headers: getOpenAIHeaders(apiKey),
       body: JSON.stringify({ model: "tts-1", input: text, voice: "alloy" })
     });
+    if (!response.ok) throw new Error("OpenAI TTS failed");
     const blob = await response.blob();
     return blobToBase64(blob);
   } else {
@@ -257,7 +258,10 @@ export const generateSpeech = async (text: string, apiKey?: string, provider: AI
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
       },
     });
-    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+    
+    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!audioData) throw new Error("Gemini TTS returned no audio data");
+    return audioData;
   }
 };
 
