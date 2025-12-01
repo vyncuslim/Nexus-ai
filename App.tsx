@@ -513,6 +513,10 @@ function App() {
   }
 
   const activeMessages = getCurrentMessages();
+  
+  // Prepare active context for MessageBubble
+  const activeKey = getActiveKey(selectedModel.provider);
+  const apiContext = activeKey ? { apiKey: activeKey, provider: selectedModel.provider } : undefined;
 
   return (
     <div className="flex h-screen bg-nexus-900 text-slate-200 font-sans overflow-hidden">
@@ -664,7 +668,7 @@ function App() {
             ) : (
               <div className="space-y-6 pb-4">
                 {activeMessages.map((msg) => (
-                  <MessageBubble key={msg.id} message={msg} />
+                  <MessageBubble key={msg.id} message={msg} apiContext={apiContext} />
                 ))}
                 <div ref={messagesEndRef} />
               </div>

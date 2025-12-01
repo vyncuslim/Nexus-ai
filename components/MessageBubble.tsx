@@ -1,11 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChatMessage, Role } from '../types';
+import { ChatMessage, Role, AIProvider } from '../types';
 import { RobotIcon, UserIcon, CopyIcon, CheckIcon, SpeakerIcon, StopIcon } from './Icon';
 import { generateSpeech } from '../services/geminiService';
 import { playAudioContent } from '../utils/audio';
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  apiContext?: {
+    apiKey: string;
+    provider: AIProvider;
+  };
 }
 
 const CodeBlock: React.FC<{ content: string }> = ({ content }) => {
@@ -40,7 +44,7 @@ const CodeBlock: React.FC<{ content: string }> = ({ content }) => {
   );
 };
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) => {
   const isUser = message.role === Role.USER;
   const isError = message.isError;
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -66,10 +70,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       return;
     }
 
+    if (!apiContext?.apiKey) {
+      alert("Please login with an API Key to use TTS.");
+      return;
+    }
+
     setIsLoadingAudio(true);
     try {
       // 1. Generate Audio
-      const base64Audio = await generateSpeech(message.text);
+      const base64Audio = await generateSpeech(message.text, apiContext.apiKey, apiContext.provider);
       
       // 2. Play Audio
       const source = await playAudioContent(base64Audio);
@@ -83,7 +92,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
     } catch (err) {
       console.error("TTS Error", err);
-      // Optional: Show toast or feedback
     } finally {
       setIsLoadingAudio(false);
     }

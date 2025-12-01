@@ -1,4 +1,4 @@
-// Audio Utility to handle Raw PCM data from Gemini TTS
+// Audio Utility to handle Raw PCM data (Gemini) and MP3 (OpenAI)
 
 let audioContext: AudioContext | null = null;
 
@@ -11,25 +11,24 @@ export const getAudioContext = () => {
   return audioContext;
 };
 
-// Base64 decoding
-function decodeBase64(base64: string) {
+function base64ToArrayBuffer(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
-  return bytes;
+  return bytes.buffer;
 }
 
-// Convert PCM 16-bit to AudioBuffer
-async function decodeAudioData(
-  data: Uint8Array,
+// Manual PCM 16-bit decode (Fallback for Gemini)
+async function decodePCM(
+  arrayBuffer: ArrayBuffer,
   ctx: AudioContext,
   sampleRate: number = 24000,
   numChannels: number = 1,
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
+  const dataInt16 = new Int16Array(arrayBuffer);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 
@@ -46,13 +45,24 @@ async function decodeAudioData(
 export const playAudioContent = async (base64Audio: string): Promise<AudioBufferSourceNode> => {
   const ctx = getAudioContext();
   
-  // Ensure context is running (browsers suspend it until interaction)
   if (ctx.state === 'suspended') {
     await ctx.resume();
   }
 
-  const audioBytes = decodeBase64(base64Audio);
-  const audioBuffer = await decodeAudioData(audioBytes, ctx);
+  const arrayBuffer = base64ToArrayBuffer(base64Audio);
+  
+  let audioBuffer: AudioBuffer;
+
+  try {
+    // 1. Try Native Decode (Works for MP3/WAV from OpenAI)
+    // We clone the buffer because decodeAudioData detaches it
+    const tempBuffer = arrayBuffer.slice(0);
+    audioBuffer = await ctx.decodeAudioData(tempBuffer);
+  } catch (e) {
+    // 2. Fallback to Manual PCM Decode (Works for Gemini Raw Audio)
+    // Gemini returns raw PCM 24kHz which native decodeAudioData often fails on
+    audioBuffer = await decodePCM(arrayBuffer, ctx);
+  }
   
   const source = ctx.createBufferSource();
   source.buffer = audioBuffer;

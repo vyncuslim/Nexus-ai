@@ -75,7 +75,7 @@ export const SYSTEM_INSTRUCTION_EN = `You are Nexus, a helpful AI assistant. Use
 
 export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus，一个有用的人工智能助手。请使用 Markdown 格式化代码。`;
 
-export const CONTACT_EMAIL = "nexusaicontact@gmail.com";
+export const CONTACT_EMAIL = "121nexusaicontact@gmail.com";
 
 export const UI_TEXT = {
   en: {
