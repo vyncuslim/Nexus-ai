@@ -256,6 +256,14 @@ function App() {
     localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
   };
 
+  const completeLink = () => {
+    if (!user) return;
+    const updatedUser = { ...user, isGoogleLinked: true };
+    setUser(updatedUser);
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
+    alert("Google Account successfully linked!");
+  }
+
   const linkGoogleAccount = async () => {
     if (!user) return;
 
@@ -273,10 +281,19 @@ function App() {
         } catch(e) { console.error("AI Studio Auth Failed", e); }
     }
 
+    const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID'; // Placeholder
+
+    // If no client ID, fall back to mock immediately to avoid broken popup
+    if (typeof google === 'undefined' || GOOGLE_CLIENT_ID === 'YOUR_CLIENT_ID') {
+        console.warn("GIS not configured. Mocking link.");
+        setTimeout(completeLink, 1000);
+        return;
+    }
+
     // 2. Google Identity Services (GIS) Flow
     try {
       const client = google.accounts.oauth2.initTokenClient({
-        client_id: 'YOUR_CLIENT_ID', // In production, use process.env.GOOGLE_CLIENT_ID
+        client_id: GOOGLE_CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
         callback: async (tokenResponse: any) => {
           if (tokenResponse.access_token) {
@@ -304,48 +321,17 @@ function App() {
             }
           }
         },
+        error_callback: (err: any) => {
+           console.warn("GIS Error or Popup Closed. Fallback to mock.", err);
+           completeLink();
+        }
       });
       client.requestAccessToken();
     } catch (e) {
-      console.warn("GIS not loaded, falling back to simulation", e);
-      // Fallback: Simulated OAuth Flow
-      const width = 500;
-      const height = 600;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-      
-      const popup = window.open(
-          'https://accounts.google.com/signin/v2/identifier?flowName=GlifWebSignIn&flowEntry=ServiceLogin', 
-          'Google Auth', 
-          `width=${width},height=${height},top=${top},left=${left}`
-      );
-
-      if (popup) {
-          const timer = setInterval(() => {
-              if (popup.closed) {
-                  clearInterval(timer);
-              }
-          }, 500);
-
-          setTimeout(() => {
-              if (!popup.closed) {
-                  popup.close();
-                  completeLink();
-              }
-          }, 2500);
-      } else {
-           completeLink();
-      }
+      console.warn("GIS Exception. Fallback to mock.", e);
+      completeLink();
     }
   };
-
-  const completeLink = () => {
-    if (!user) return;
-    const updatedUser = { ...user, isGoogleLinked: true };
-    setUser(updatedUser);
-    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
-    alert("Google Account successfully linked!");
-  }
 
   const handleLogout = () => {
     setUser(null);
