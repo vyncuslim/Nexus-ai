@@ -2,12 +2,13 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
 import AuthScreen from './components/AuthScreen';
-import { SendIcon, MenuIcon, ChevronDownIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon, UndoIcon, RedoIcon, SparklesIcon, BroomIcon, GoogleIcon, OpenAIIcon, CodeBlockIcon } from './components/Icon';
-import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, UI_TEXT } from './constants';
-import { ChatMessage, Role, ModelConfig, ChatSession, User, Language } from './types';
+import { SendIcon, MenuIcon, ChevronDownIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon, UndoIcon, RedoIcon, SparklesIcon, BroomIcon, GoogleIcon, OpenAIIcon, CodeBlockIcon, MicIcon, MagicWandIcon, StopIcon } from './components/Icon';
+import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, UI_TEXT, PERSONAS } from './constants';
+import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, WorkspaceType } from './types';
 import { streamGeminiResponse, generateImage, generateVideo } from './services/geminiService';
 import { useHistory } from './hooks/useHistory';
 import { v4 as uuidv4 } from 'uuid';
+import { GoogleGenAI } from "@google/genai";
 
 function App() {
   // --- Persistent State Keys ---
@@ -25,6 +26,10 @@ function App() {
   const [language, setLanguage] = useState<Language>('en');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
+  // Workspace & Persona
+  const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceType>('personal');
+  const [currentPersonaId, setCurrentPersonaId] = useState<string>('default');
+
   // Undo/Redo History for Sessions
   const sessionsControl = useHistory<ChatSession[]>([]);
   const sessions = sessionsControl.state;
@@ -38,9 +43,11 @@ function App() {
   const setInputValue = inputControl.set;
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelConfig>(GEMINI_MODELS[0]);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   
   // Media Config State
   const [imageSize, setImageSize] = useState("1K");
@@ -48,15 +55,17 @@ function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   // --- Load Initial State ---
   useEffect(() => {
-    // Load Language
+    // Load Language & Preferences
     const prefs = localStorage.getItem(STORAGE_KEY_PREFS);
     if (prefs) {
       try {
         const p = JSON.parse(prefs);
         if (p.language) setLanguage(p.language);
+        if (p.personaId) setCurrentPersonaId(p.personaId);
       } catch (e) { console.error(e); }
     }
 
@@ -72,10 +81,17 @@ function App() {
         setUser(u);
         if (storedOpenAI) setOpenaiKey(storedOpenAI);
         if (storedGoogle) setGoogleKey(storedGoogle);
-        loadSessions(u.id);
+        // Load sessions will be called in the next effect when user is set
       } catch (e) { console.error(e); }
     }
   }, []);
+
+  // Reload sessions when User or Workspace changes
+  useEffect(() => {
+    if (user) {
+      loadSessions(user.id, currentWorkspace);
+    }
+  }, [user, currentWorkspace]);
 
   // Protect against closing tab while generating
   useEffect(() => {
@@ -100,18 +116,23 @@ function App() {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [user, sessions]); 
+  }, [user, sessions, currentWorkspace]); 
 
   // --- Session Management Helpers ---
-  const loadSessions = (userId: string) => {
-    const storedSessions = localStorage.getItem(STORAGE_KEY_SESSIONS_PREFIX + userId);
+  const loadSessions = (userId: string, workspace: WorkspaceType) => {
+    // Separate storage key for workspace
+    const key = `${STORAGE_KEY_SESSIONS_PREFIX}${workspace}_${userId}`;
+    const storedSessions = localStorage.getItem(key);
+    
     if (storedSessions) {
       try {
         const s: ChatSession[] = JSON.parse(storedSessions);
         s.sort((a, b) => b.updatedAt - a.updatedAt);
-        setSessions(s, true);
+        setSessions(s, true); // skip history for initial load
         if (s.length > 0) {
           setCurrentSessionId(s[0].id);
+        } else {
+          setCurrentSessionId(null);
         }
       } catch (e) {
         console.error("Failed to load sessions", e);
@@ -119,12 +140,14 @@ function App() {
       }
     } else {
       setSessions([], true);
+      setCurrentSessionId(null);
     }
   };
 
-  const saveSessionsToStorage = (updatedSessions: ChatSession[], userId: string) => {
+  const saveSessionsToStorage = (updatedSessions: ChatSession[], userId: string, workspace: WorkspaceType) => {
     try {
-      localStorage.setItem(STORAGE_KEY_SESSIONS_PREFIX + userId, JSON.stringify(updatedSessions));
+      const key = `${STORAGE_KEY_SESSIONS_PREFIX}${workspace}_${userId}`;
+      localStorage.setItem(key, JSON.stringify(updatedSessions));
     } catch (e) {
       console.error("Storage limit reached", e);
     }
@@ -143,7 +166,7 @@ function App() {
     setSessions(updatedSessions);
     setCurrentSessionId(newSession.id);
     setSidebarOpen(false); 
-    saveSessionsToStorage(updatedSessions, user.id);
+    saveSessionsToStorage(updatedSessions, user.id, currentWorkspace);
   };
 
   const deleteSession = (sessionId: string, e: React.MouseEvent) => {
@@ -151,7 +174,7 @@ function App() {
     if (!user) return;
     const updatedSessions = sessions.filter(s => s.id !== sessionId);
     setSessions(updatedSessions);
-    saveSessionsToStorage(updatedSessions, user.id);
+    saveSessionsToStorage(updatedSessions, user.id, currentWorkspace);
     
     if (currentSessionId === sessionId) {
       setCurrentSessionId(updatedSessions.length > 0 ? updatedSessions[0].id : null);
@@ -169,7 +192,7 @@ function App() {
     });
 
     setSessions(updatedSessions);
-    saveSessionsToStorage(updatedSessions, user.id);
+    saveSessionsToStorage(updatedSessions, user.id, currentWorkspace);
     setShowClearConfirm(false);
   };
 
@@ -194,8 +217,6 @@ function App() {
     
     localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(u));
     localStorage.setItem(STORAGE_KEY_INVITE_CODE, inviteCode);
-    
-    loadSessions(u.id);
   };
 
   const updateUserAvatar = (avatarBase64: string) => {
@@ -224,8 +245,82 @@ function App() {
   const toggleLanguage = () => {
     const newLang = language === 'en' ? 'zh' : 'en';
     setLanguage(newLang);
-    localStorage.setItem(STORAGE_KEY_PREFS, JSON.stringify({ language: newLang }));
+    const prefs = localStorage.getItem(STORAGE_KEY_PREFS) ? JSON.parse(localStorage.getItem(STORAGE_KEY_PREFS)!) : {};
+    localStorage.setItem(STORAGE_KEY_PREFS, JSON.stringify({ ...prefs, language: newLang }));
   };
+
+  const updatePersona = (id: string) => {
+    setCurrentPersonaId(id);
+    const prefs = localStorage.getItem(STORAGE_KEY_PREFS) ? JSON.parse(localStorage.getItem(STORAGE_KEY_PREFS)!) : {};
+    localStorage.setItem(STORAGE_KEY_PREFS, JSON.stringify({ ...prefs, personaId: id }));
+  }
+
+  // --- Voice Input Logic ---
+  const toggleListening = () => {
+    if (isListening) {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    recognition.lang = language === 'zh' ? 'zh-CN' : 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInputValue((prev) => prev ? prev + " " + transcript : transcript);
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech error", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+    setIsListening(true);
+  };
+
+  // --- Prompt Optimization Logic ---
+  const handleOptimizePrompt = async () => {
+    if (!inputValue.trim() || isOptimizing || !googleKey) return;
+    
+    setIsOptimizing(true);
+    try {
+       const ai = new GoogleGenAI({ apiKey: googleKey });
+       const prompt = language === 'zh' 
+          ? `请重写并优化以下提示词，使其在 AI 生成内容时更加有效和详细。直接返回优化后的提示词，不要包含其他解释：\n\n${inputValue}`
+          : `Rewrite and optimize the following prompt to be more effective and detailed for AI generation. Return ONLY the optimized prompt with no explanation:\n\n${inputValue}`;
+       
+       const response = await ai.models.generateContent({
+         model: 'gemini-2.5-flash',
+         contents: prompt
+       });
+       
+       const optimized = response.text;
+       if (optimized) {
+         setInputValue(optimized.trim());
+       }
+    } catch (e) {
+      console.error("Optimization failed", e);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
 
   // --- Chat & Generation Logic ---
   const getCurrentMessages = () => {
@@ -353,7 +448,7 @@ function App() {
           return s;
       });
       setSessions(finalSessions);
-      saveSessionsToStorage(finalSessions, user.id);
+      saveSessionsToStorage(finalSessions, user.id, currentWorkspace);
 
     } catch (e) {
       console.error(e);
@@ -414,7 +509,7 @@ function App() {
     updatedSessions = updatedSessions.filter(s => s.id !== targetSessionId);
     updatedSessions.unshift(targetSession);
     setSessions([...updatedSessions]);
-    saveSessionsToStorage(updatedSessions, currentUserId);
+    saveSessionsToStorage(updatedSessions, currentUserId, currentWorkspace);
     
     setIsLoading(true);
 
@@ -452,13 +547,17 @@ function App() {
         targetSession.messages.push(initialModelMsg);
         setSessions([...updatedSessions]);
         
-        const systemInstruction = language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN;
+        // Construct System Instruction based on Persona
+        const baseInstruction = language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN;
+        const persona = PERSONAS.find(p => p.id === currentPersonaId);
+        const personaInstruction = persona ? `\n\n${persona.instruction}` : "";
+        const finalSystemInstruction = baseInstruction + personaInstruction;
 
         const finalResponseText = await streamGeminiResponse(
           selectedModel,
           targetSession.messages.slice(0, -1),
           userText,
-          systemInstruction,
+          finalSystemInstruction,
           (currentFullText) => {
             setSessions((prev) => {
                const news = [...prev];
@@ -474,7 +573,7 @@ function App() {
         if (finalMsg) finalMsg.text = finalResponseText;
       }
       
-      saveSessionsToStorage(updatedSessions, currentUserId);
+      saveSessionsToStorage(updatedSessions, currentUserId, currentWorkspace);
 
     } catch (error: any) {
       console.error("Generation failed", error);
@@ -487,11 +586,11 @@ function App() {
       };
       targetSession.messages.push(errorMsg);
       setSessions([...updatedSessions]);
-      saveSessionsToStorage(updatedSessions, currentUserId);
+      saveSessionsToStorage(updatedSessions, currentUserId, currentWorkspace);
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, googleKey, language, imageSize, videoAspectRatio, setSessions, setInputValue]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, googleKey, language, imageSize, videoAspectRatio, setSessions, setInputValue, currentWorkspace, currentPersonaId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -567,6 +666,10 @@ function App() {
         onRedo={sessionsControl.redo}
         canUndo={sessionsControl.canUndo}
         canRedo={sessionsControl.canRedo}
+        currentWorkspace={currentWorkspace}
+        onSwitchWorkspace={setCurrentWorkspace}
+        currentPersonaId={currentPersonaId}
+        onUpdatePersona={updatePersona}
       />
 
       <main className="flex-1 flex flex-col relative w-full h-full transition-all">
@@ -668,6 +771,12 @@ function App() {
                 <div className="w-20 h-20 bg-gradient-to-tr from-emerald-500 to-teal-600 rounded-2xl mb-6 shadow-2xl animate-pulse-slow"></div>
                 <h1 className="text-3xl font-bold mb-2 text-white">{t.welcomeTitle}</h1>
                 <p className="text-emerald-400 text-center">{t.welcomeSubtitle}</p>
+                {/* Active Persona Badge */}
+                {currentPersonaId !== 'default' && (
+                  <div className="mt-4 px-3 py-1 bg-nexus-800 rounded-full border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+                    Using Persona: {PERSONAS.find(p => p.id === currentPersonaId)?.name}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-6 pb-4">
@@ -691,6 +800,18 @@ function App() {
                 <button onClick={() => wrapSelection('```\n', '\n```', 'code block')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Insert Code Block"><CodeBlockIcon /></button>
                 <button onClick={() => wrapSelection('[', '](url)', 'link text')} className="p-1.5 text-gray-400 hover:text-white hover:bg-nexus-800 rounded transition-colors" title="Link"><LinkIcon /></button>
                 <div className="w-px h-4 bg-nexus-700 mx-2"></div>
+                
+                {/* Prompt Optimizer */}
+                <button 
+                  onClick={handleOptimizePrompt}
+                  disabled={!inputValue || isOptimizing}
+                  className={`p-1.5 rounded transition-colors ${isOptimizing ? 'text-emerald-400 animate-pulse' : 'text-gray-400 hover:text-emerald-400 hover:bg-nexus-800'}`}
+                  title={t.optimizer}
+                >
+                  <MagicWandIcon />
+                </button>
+
+                <div className="w-px h-4 bg-nexus-700 mx-2"></div>
                 <button onClick={inputControl.undo} disabled={!inputControl.canUndo} className={`p-1.5 rounded transition-colors ${inputControl.canUndo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`} title="Undo"><UndoIcon /></button>
                 <button onClick={inputControl.redo} disabled={!inputControl.canRedo} className={`p-1.5 rounded transition-colors ${inputControl.canRedo ? 'text-gray-400 hover:text-white hover:bg-nexus-800' : 'text-gray-700 cursor-not-allowed'}`} title="Redo"><RedoIcon /></button>
               </div>
@@ -703,23 +824,38 @@ function App() {
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder={t.placeholder}
+                placeholder={isListening ? t.listening : t.placeholder}
                 className="w-full bg-transparent text-white placeholder-gray-500 rounded-2xl pl-5 pr-14 py-4 focus:outline-none resize-none overflow-hidden text-base font-sans"
                 />
                 
-                <button
-                onClick={handleSendMessage}
-                disabled={isLoading || !inputValue.trim()}
-                className={`
-                    absolute right-2 bottom-2 p-2.5 rounded-xl transition-all duration-300 transform
-                    ${inputValue.trim() && !isLoading 
-                    ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-md hover:scale-105' 
-                    : 'bg-nexus-700/50 text-gray-500 cursor-not-allowed'}
-                `}
-                >
-                <SendIcon />
-                </button>
+                <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                   {/* Voice Input */}
+                   <button
+                    onClick={toggleListening}
+                    className={`
+                      p-2.5 rounded-xl transition-all duration-300 transform
+                      ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-gray-400 hover:bg-nexus-700 hover:text-white'}
+                    `}
+                    title="Voice Input"
+                   >
+                     {isListening ? <StopIcon /> : <MicIcon />}
+                   </button>
+
+                    <button
+                    onClick={handleSendMessage}
+                    disabled={isLoading || !inputValue.trim()}
+                    className={`
+                        p-2.5 rounded-xl transition-all duration-300 transform
+                        ${inputValue.trim() && !isLoading 
+                        ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-md hover:scale-105' 
+                        : 'bg-nexus-700/50 text-gray-500 cursor-not-allowed'}
+                    `}
+                    >
+                    <SendIcon />
+                    </button>
+                </div>
             </div>
+            {isOptimizing && <div className="text-xs text-emerald-400 mt-1 ml-2 font-mono animate-pulse">{t.optimizing}</div>}
           </div>
         </div>
 

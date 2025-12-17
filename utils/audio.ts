@@ -30,6 +30,11 @@ async function decodePCM(
 ): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(arrayBuffer);
   const frameCount = dataInt16.length / numChannels;
+  
+  if (frameCount === 0) {
+      throw new Error("Decoding PCM failed: Empty buffer");
+  }
+
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 
   for (let channel = 0; channel < numChannels; channel++) {
@@ -45,6 +50,7 @@ async function decodePCM(
 export const playAudioContent = async (base64Audio: string): Promise<AudioBufferSourceNode> => {
   const ctx = getAudioContext();
   
+  // Ensure context is running (browser autoplay policy often suspends it)
   if (ctx.state === 'suspended') {
     await ctx.resume();
   }
@@ -61,8 +67,13 @@ export const playAudioContent = async (base64Audio: string): Promise<AudioBuffer
   } catch (e) {
     // 2. Fallback to Manual PCM Decode (Works for Gemini Raw Audio)
     // Gemini returns raw PCM 24kHz which native decodeAudioData often fails on
-    // console.log("Native decode failed, attempting PCM decode...", e);
-    audioBuffer = await decodePCM(arrayBuffer, ctx);
+    // console.warn("Native decode failed, attempting PCM decode...", e);
+    try {
+        audioBuffer = await decodePCM(arrayBuffer, ctx);
+    } catch (pcmError) {
+        console.error("Audio decoding failed completely", pcmError);
+        throw pcmError;
+    }
   }
   
   const source = ctx.createBufferSource();

@@ -1,4 +1,4 @@
-import { ModelConfig } from './types';
+import { ModelConfig, Persona } from './types';
 
 // Combined Models List
 export const GEMINI_MODELS: ModelConfig[] = [
@@ -59,6 +59,39 @@ export const GEMINI_MODELS: ModelConfig[] = [
     category: 'video',
     provider: 'google',
     isPro: true
+  }
+];
+
+export const PERSONAS: Persona[] = [
+  {
+    id: 'default',
+    name: 'Nexus (Default)',
+    description: 'Helpful, neutral, and precise.',
+    instruction: ''
+  },
+  {
+    id: 'developer',
+    name: 'Senior Developer',
+    description: 'Expert in code, architecture, and debugging.',
+    instruction: 'You are an expert Senior Software Engineer. You prefer concise, technical answers. You always provide code snippets in best-practice patterns. You focus on performance, scalability, and clean code.'
+  },
+  {
+    id: 'creative',
+    name: 'Creative Writer',
+    description: 'Imaginative, descriptive, and engaging.',
+    instruction: 'You are a creative writer. Use vivid imagery, metaphors, and engaging storytelling techniques. Avoid dry, robotic language. Focus on emotion and narrative flow.'
+  },
+  {
+    id: 'teacher',
+    name: 'Socratic Tutor',
+    description: 'Guides you to answers with questions.',
+    instruction: 'You are a Socratic tutor. Instead of giving direct answers, guide the user to the solution by asking thought-provoking questions. Break down complex concepts into simple, digestible parts.'
+  },
+  {
+    id: 'roast',
+    name: 'Sarcastic Bot',
+    description: 'Funny, slightly mean, but helpful.',
+    instruction: 'You are a sarcastic AI. You provide helpful answers but wrap them in witty, dry humor and mild roasting of the user\'s questions. Keep it fun, not offensive.'
   }
 ];
 
@@ -124,7 +157,16 @@ export const UI_TEXT = {
     userGuide: "User Guide",
     contactUs: "Contact Us",
     undo: "Undo",
-    redo: "Redo"
+    redo: "Redo",
+    workspacePersonal: "Personal",
+    workspaceTeam: "Team Space",
+    searchPlaceholder: "Search chats...",
+    settings: "Settings",
+    persona: "AI Persona",
+    selectPersona: "Select AI Personality",
+    optimizer: "Optimize Prompt",
+    optimizing: "Optimizing...",
+    listening: "Listening..."
   },
   zh: {
     newChat: "新建会话",
@@ -172,7 +214,16 @@ export const UI_TEXT = {
     userGuide: "使用说明",
     contactUs: "联系我们",
     undo: "撤销",
-    redo: "重做"
+    redo: "重做",
+    workspacePersonal: "个人空间",
+    workspaceTeam: "团队协作",
+    searchPlaceholder: "搜索会话...",
+    settings: "设置",
+    persona: "AI 人格",
+    selectPersona: "选择 AI 性格",
+    optimizer: "优化提示词",
+    optimizing: "优化中...",
+    listening: "正在听..."
   }
 };
 
@@ -183,20 +234,20 @@ export const USER_GUIDE = {
       content: "Nexus integrates both OpenAI (GPT-3.5, GPT-4o, DALL-E 3) and Google Gemini (Flash, Pro, Veo). Use the dropdown at the top to switch providers instantly."
     },
     {
-      title: "2. Media Generation",
-      content: "Select 'DALL-E 3' or 'Gemini 3 Image' to generate images. Select 'Veo Video' to generate short videos. Describe what you want to see in the chat box."
+      title: "2. Multimodal & Voice",
+      content: "Use the microphone icon to speak your prompts. Use the speaker icon on messages to hear the AI read them aloud. Generate images and videos by selecting the appropriate models."
     },
     {
-      title: "3. Smart Tools",
-      content: "Use the toolbar above the input to format text (Bold, Italic, Code). Use the 'Undo/Redo' buttons to correct your input history."
+      title: "3. Smart Tools & Optimizer",
+      content: "Click the Magic Wand icon to automatically improve your prompt using AI. Use the toolbar for formatting, and the Undo/Redo buttons to correct mistakes."
     },
     {
-      title: "4. Audio & Speech",
-      content: "Click the 'Speaker' icon on any AI message to read it aloud using high-quality Text-to-Speech."
+      title: "4. Workspaces & Personas",
+      content: "Switch between Personal and Team workspaces in the sidebar to keep chats organized. Use Settings to change the AI's personality (e.g., Developer, Creative Writer)."
     },
     {
-      title: "5. Shortcuts",
-      content: "Alt + N: New Chat | Enter: Send | Shift + Enter: New Line."
+      title: "5. Search & Organization",
+      content: "Use the search bar in the sidebar to find past conversations quickly. History is grouped by date."
     }
   ],
   zh: [
@@ -205,20 +256,20 @@ export const USER_GUIDE = {
       content: "Nexus 集成了 OpenAI (GPT-3.5, GPT-4o, DALL-E 3) 和 Google Gemini (Flash, Pro, Veo)。点击顶部菜单即可在不同模型间无缝切换。"
     },
     {
-      title: "2. 媒体生成",
-      content: "选择 'DALL-E 3' 或 'Gemini 3 Image' 生成图像。选择 'Veo Video' 生成短视频。只需在输入框描述您想看到的画面。"
+      title: "2. 多模态与语音",
+      content: "点击麦克风图标进行语音输入。点击消息上的喇叭图标朗读内容。选择相应的模型即可生成图像和视频。"
     },
     {
-      title: "3. 智能工具栏",
-      content: "使用输入框上方的工具栏格式化文本（加粗、斜体、代码块）。使用 '撤销/重做' 按钮管理您的输入历史。"
+      title: "3. 智能工具与优化",
+      content: "点击魔术棒图标，AI 将自动优化您的提示词以获得更好结果。使用工具栏格式化文本，或使用撤销/重做纠正错误。"
     },
     {
-      title: "4. 语音朗读",
-      content: "点击 AI 回复气泡上的 '喇叭' 图标，即可使用高质量语音朗读内容。"
+      title: "4. 工作区与人格",
+      content: "在侧边栏切换“个人”或“团队”工作区以分类管理会话。在设置中更改 AI 的性格（如：程序员专家、创意作家）。"
     },
     {
-      title: "5. 快捷键",
-      content: "Alt + N: 新建会话 | Enter: 发送 | Shift + Enter: 换行"
+      title: "5. 搜索与整理",
+      content: "使用侧边栏的搜索框快速查找过往对话。历史记录已按日期自动分组。"
     }
   ]
 };

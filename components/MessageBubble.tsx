@@ -178,11 +178,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
               ? 'bg-red-900/20 text-red-200 border-red-500/50 rounded-tl-sm' 
               : 'bg-nexus-800 text-gray-100 rounded-tl-sm border-nexus-700'}
         `}>
-          {/* Label */}
-          <div className="text-xs font-semibold opacity-50 mb-1 flex justify-between items-center">
-            <span>{isUser ? 'You' : 'Nexus'}</span>
+          {/* Label Header - Removed opacity-50 from parent to make button clearly visible */}
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-xs font-semibold opacity-50">{isUser ? 'You' : 'Nexus'}</span>
+            
             <div className="flex items-center gap-2">
-               {isError && <span className="text-red-400 ml-2">ERROR</span>}
+               {isError && <span className="text-red-400 text-xs ml-2">ERROR</span>}
                
                {/* TTS Button (Only for Model) */}
                {!isUser && !isError && message.text && (
@@ -190,14 +191,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
                    onClick={toggleSpeech}
                    disabled={isLoadingAudio}
                    className={`
-                     p-1.5 rounded-md transition-all duration-200
+                     p-1 rounded-md transition-all duration-200 flex items-center justify-center
                      ${ttsError 
                         ? 'text-red-400 bg-red-900/20' 
                         : isSpeaking 
-                            ? 'text-nexus-accent bg-nexus-900/50 ring-1 ring-nexus-accent/30' 
+                            ? 'text-nexus-accent bg-nexus-900/50 ring-1 ring-nexus-accent/30 shadow-[0_0_10px_rgba(59,130,246,0.3)]' 
                             : 'text-gray-500 hover:text-white hover:bg-nexus-700'}
                    `}
                    title={ttsError ? "TTS Failed" : isSpeaking ? "Stop" : "Read Aloud"}
+                   aria-label={isSpeaking ? "Stop reading" : "Read aloud"}
                  >
                    {isLoadingAudio ? (
                      <span className="block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>

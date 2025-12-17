@@ -51,3 +51,12 @@ export interface User {
   name: string;
   avatar?: string; // Base64 string
 }
+
+export type WorkspaceType = 'personal' | 'team';
+
+export interface Persona {
+  id: string;
+  name: string;
+  description: string;
+  instruction: string;
+}
