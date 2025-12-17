@@ -14,11 +14,26 @@ export interface Attachment {
   mimeType?: string;
 }
 
+export interface GroundingChunk {
+  web?: {
+    uri: string;
+    title: string;
+  };
+}
+
+export interface GroundingMetadata {
+  groundingChunks?: GroundingChunk[];
+  searchEntryPoint?: {
+    renderedContent: string;
+  };
+}
+
 export interface ChatMessage {
   id: string;
   role: Role;
   text: string;
   attachment?: Attachment;
+  groundingMetadata?: GroundingMetadata;
   isError?: boolean;
   timestamp: number;
 }

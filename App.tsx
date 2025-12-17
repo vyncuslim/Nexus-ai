@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
 import AuthScreen from './components/AuthScreen';
-import { SendIcon, MenuIcon, ChevronDownIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon, UndoIcon, RedoIcon, SparklesIcon, BroomIcon, GoogleIcon, OpenAIIcon, CodeBlockIcon, MicIcon, MagicWandIcon, StopIcon } from './components/Icon';
+import { SendIcon, MenuIcon, ChevronDownIcon, BoldIcon, ItalicIcon, CodeIcon, ImageIcon, VideoIcon, LinkIcon, UndoIcon, RedoIcon, SparklesIcon, BroomIcon, GoogleIcon, OpenAIIcon, CodeBlockIcon, MicIcon, MagicWandIcon, StopIcon, GlobeIcon, BrainIcon } from './components/Icon';
 import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, UI_TEXT, PERSONAS } from './constants';
 import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, WorkspaceType } from './types';
 import { streamGeminiResponse, generateImage, generateVideo } from './services/geminiService';
@@ -27,6 +27,10 @@ function App() {
   // Workspace & Persona
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceType>('personal');
   const [currentPersonaId, setCurrentPersonaId] = useState<string>('default');
+
+  // Generation Options
+  const [useSearch, setUseSearch] = useState(false);
+  const [useThinking, setUseThinking] = useState(false);
 
   // Undo/Redo History for Sessions
   const sessionsControl = useHistory<ChatSession[]>([]);
@@ -543,7 +547,7 @@ function App() {
         const personaInstruction = persona ? `\n\n${persona.instruction}` : "";
         const finalSystemInstruction = baseInstruction + personaInstruction;
 
-        const finalResponseText = await streamGeminiResponse(
+        const result = await streamGeminiResponse(
           selectedModel,
           targetSession.messages.slice(0, -1),
           userText,
@@ -557,10 +561,18 @@ function App() {
                return news;
             }, true);
           },
-          apiKey
+          apiKey,
+          {
+            useSearch: useSearch && selectedModel.provider === 'google',
+            useThinking: useThinking && selectedModel.provider === 'google'
+          }
         );
+        
         const finalMsg = targetSession.messages.find(m => m.id === modelMsgId);
-        if (finalMsg) finalMsg.text = finalResponseText;
+        if (finalMsg) {
+          finalMsg.text = result.text;
+          finalMsg.groundingMetadata = result.groundingMetadata;
+        }
       }
       
       saveSessionsToStorage(updatedSessions, currentUserId, currentWorkspace);
@@ -580,7 +592,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, language, imageSize, videoAspectRatio, setSessions, setInputValue, currentWorkspace, currentPersonaId]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, language, imageSize, videoAspectRatio, setSessions, setInputValue, currentWorkspace, currentPersonaId, useSearch, useThinking]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -677,7 +689,7 @@ function App() {
             <div className="relative">
               <button 
                 onClick={() => setModelMenuOpen(!modelMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 hover:bg-nexus-800 rounded-lg transition-colors text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-nexus-800 rounded-lg transition-colors text-sm font-medium border border-transparent hover:border-nexus-700"
               >
                 {selectedModel.provider === 'openai' ? <OpenAIIcon /> : <GoogleIcon />}
                 <span className={selectedModel.isPro ? "text-purple-400" : "text-emerald-400"}>
@@ -711,6 +723,26 @@ function App() {
                 </div>
               )}
             </div>
+
+            {/* Google Capabilities Toggles */}
+            {selectedModel.provider === 'google' && selectedModel.category === 'text' && (
+              <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-nexus-700/50">
+                <button
+                  onClick={() => setUseSearch(!useSearch)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${useSearch ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/50' : 'text-gray-400 border-transparent hover:bg-nexus-800'}`}
+                  title="Enable Google Search Grounding"
+                >
+                  <GlobeIcon /> Search
+                </button>
+                <button
+                  onClick={() => setUseThinking(!useThinking)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${useThinking ? 'bg-purple-900/30 text-purple-400 border-purple-500/50' : 'text-gray-400 border-transparent hover:bg-nexus-800'}`}
+                  title="Enable Deep Thinking Mode"
+                >
+                  <BrainIcon /> Think
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">

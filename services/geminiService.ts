@@ -1,4 +1,4 @@
-import { ChatMessage, Role, AIProvider, ModelConfig } from "../types";
+import { ChatMessage, Role, AIProvider, ModelConfig, GroundingMetadata } from "../types";
 import { GoogleGenAI, Modality } from "@google/genai";
 
 /**
@@ -15,6 +15,16 @@ const getOpenAIHeaders = (apiKey: string) => ({
   "Authorization": `Bearer ${apiKey}`
 });
 
+interface GenerationOptions {
+  useSearch?: boolean;
+  useThinking?: boolean;
+}
+
+interface StreamResult {
+  text: string;
+  groundingMetadata?: GroundingMetadata;
+}
+
 /**
  * Stream Response (Unified)
  */
@@ -24,14 +34,16 @@ export const streamGeminiResponse = async (
   newMessage: string,
   systemInstruction: string,
   onChunk: (text: string) => void,
-  apiKey?: string
-): Promise<string> => {
+  apiKey?: string,
+  options: GenerationOptions = {}
+): Promise<StreamResult> => {
   if (model.provider === 'openai') {
     if (!apiKey) throw new Error("API Key missing for OpenAI");
-    return streamOpenAIResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey);
+    const text = await streamOpenAIResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey);
+    return { text };
   } else {
     // Google uses process.env.API_KEY directly
-    return streamGoogleResponse(model.id, history, newMessage, systemInstruction, onChunk);
+    return streamGoogleResponse(model.id, history, newMessage, systemInstruction, onChunk, options);
   }
 };
 
@@ -109,8 +121,9 @@ const streamGoogleResponse = async (
   history: ChatMessage[],
   newMessage: string,
   systemInstruction: string,
-  onChunk: (text: string) => void
-): Promise<string> => {
+  onChunk: (text: string) => void,
+  options: GenerationOptions
+): Promise<StreamResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   // Transform history to Google format
@@ -119,23 +132,55 @@ const streamGoogleResponse = async (
     parts: [{ text: msg.text }],
   }));
 
+  const config: any = { 
+    systemInstruction,
+  };
+
+  // 1. Thinking Config
+  if (options.useThinking) {
+    // Only 2.5 series supports thinking config properly in this context usually, 
+    // or specific thinking models.
+    // The prompt says "gemini-3-pro-preview" supports 32768, 2.5 flash 24576.
+    // We'll set a safe budget if the user explicitly asks for thinking.
+    // Note: thinkingConfig is only available for 2.5 series and 3-pro per docs provided.
+    if (modelId.includes('gemini-2.5') || modelId.includes('gemini-3')) {
+       config.thinkingConfig = { thinkingBudget: 1024 * 4 }; // 4k tokens for reasoning
+    }
+  }
+
+  // 2. Tools (Search)
+  if (options.useSearch) {
+    config.tools = [{ googleSearch: {} }];
+    // Google Search cannot be used with responseMimeType/Schema
+  }
+
   const chat = ai.chats.create({
     model: modelId,
     history: googleHistory,
-    config: { systemInstruction }
+    config: config
   });
 
   const result = await chat.sendMessageStream({ message: newMessage });
   
   let fullText = "";
+  let groundingMetadata: GroundingMetadata | undefined;
+
   for await (const chunk of result) {
     const text = chunk.text;
     if (text) {
       fullText += text;
       onChunk(fullText);
     }
+    
+    // Check for grounding metadata in chunks
+    // The SDK types might require casting or checking properties loosely if not perfectly typed yet
+    const candidate = chunk.candidates?.[0];
+    if (candidate?.groundingMetadata) {
+      groundingMetadata = candidate.groundingMetadata as GroundingMetadata;
+    }
   }
-  return fullText;
+
+  return { text: fullText, groundingMetadata };
 };
 
 /**
