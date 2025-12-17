@@ -4,20 +4,20 @@ import { ModelConfig, Persona } from './types';
 export const GEMINI_MODELS: ModelConfig[] = [
   // OpenAI Models
   {
-    id: 'gpt-3.5-turbo',
-    name: 'GPT-3.5 Turbo',
-    description: 'Fast. Everyday tasks.',
-    category: 'text',
-    provider: 'openai',
-    isPro: false
-  },
-  {
     id: 'gpt-4o',
     name: 'GPT-4o',
     description: 'Smartest. Complex reasoning.',
     category: 'text',
     provider: 'openai',
     isPro: true
+  },
+  {
+    id: 'gpt-3.5-turbo',
+    name: 'GPT-3.5 Turbo',
+    description: 'Fast. Everyday tasks.',
+    category: 'text',
+    provider: 'openai',
+    isPro: false
   },
   {
     id: 'dall-e-3',
@@ -58,6 +58,24 @@ export const GEMINI_MODELS: ModelConfig[] = [
     description: 'Generate videos (720p).',
     category: 'video',
     provider: 'google',
+    isPro: true
+  },
+  // Anthropic Models
+  {
+    id: 'claude-3-5-sonnet-20240620',
+    name: 'Claude 3.5 Sonnet',
+    description: 'Articulate & precise.',
+    category: 'text',
+    provider: 'anthropic',
+    isPro: true
+  },
+  // CodeX Models
+  {
+    id: 'codex-davinci-002',
+    name: 'CodeX Ultra',
+    description: 'Specialized code generation.',
+    category: 'text',
+    provider: 'codex',
     isPro: true
   }
 ];
@@ -158,15 +176,18 @@ export const UI_TEXT = {
     contactUs: "Contact Us",
     undo: "Undo",
     redo: "Redo",
-    workspacePersonal: "Personal",
-    workspaceTeam: "Team Space",
     searchPlaceholder: "Search chats...",
     settings: "Settings",
     persona: "AI Persona",
     selectPersona: "Select AI Personality",
     optimizer: "Optimize Prompt",
     optimizing: "Optimizing...",
-    listening: "Listening..."
+    listening: "Listening...",
+    linkGoogle: "Link Google Account",
+    googleLinked: "Google Account Linked",
+    apiKeys: "API Keys",
+    share: "Share",
+    shareSuccess: "Link Copied!",
   },
   zh: {
     newChat: "新建会话",
@@ -215,23 +236,26 @@ export const UI_TEXT = {
     contactUs: "联系我们",
     undo: "撤销",
     redo: "重做",
-    workspacePersonal: "个人空间",
-    workspaceTeam: "团队协作",
     searchPlaceholder: "搜索会话...",
     settings: "设置",
     persona: "AI 人格",
     selectPersona: "选择 AI 性格",
     optimizer: "优化提示词",
     optimizing: "优化中...",
-    listening: "正在听..."
+    listening: "正在听...",
+    linkGoogle: "关联 Google 账号",
+    googleLinked: "已关联 Google 账号",
+    apiKeys: "API 密钥管理",
+    share: "分享",
+    shareSuccess: "链接已复制！",
   }
 };
 
 export const USER_GUIDE = {
   en: [
     {
-      title: "1. Dual AI Engine",
-      content: "Nexus integrates both OpenAI (GPT-3.5, GPT-4o, DALL-E 3) and Google Gemini (Flash, Pro, Veo). Use the dropdown at the top to switch providers instantly."
+      title: "1. Multi-Model AI Engine",
+      content: "Nexus integrates OpenAI, Google Gemini, Anthropic Claude, and CodeX. Use the dropdown at the top to switch providers instantly."
     },
     {
       title: "2. Multimodal & Voice",
@@ -242,8 +266,8 @@ export const USER_GUIDE = {
       content: "Click the Magic Wand icon to automatically improve your prompt using AI. Use the toolbar for formatting, and the Undo/Redo buttons to correct mistakes."
     },
     {
-      title: "4. Workspaces & Personas",
-      content: "Switch between Personal and Team workspaces in the sidebar to keep chats organized. Use Settings to change the AI's personality (e.g., Developer, Creative Writer)."
+      title: "4. Personas & Settings",
+      content: "Use Settings to link accounts, manage API keys, and change the AI's personality (e.g., Developer, Creative Writer)."
     },
     {
       title: "5. Search & Organization",
@@ -252,8 +276,8 @@ export const USER_GUIDE = {
   ],
   zh: [
     {
-      title: "1. 双核 AI 引擎",
-      content: "Nexus 集成了 OpenAI (GPT-3.5, GPT-4o, DALL-E 3) 和 Google Gemini (Flash, Pro, Veo)。点击顶部菜单即可在不同模型间无缝切换。"
+      title: "1. 多模型 AI 引擎",
+      content: "Nexus 集成了 OpenAI, Google Gemini, Anthropic Claude 和 CodeX。点击顶部菜单即可在不同模型间无缝切换。"
     },
     {
       title: "2. 多模态与语音",
@@ -264,8 +288,8 @@ export const USER_GUIDE = {
       content: "点击魔术棒图标，AI 将自动优化您的提示词以获得更好结果。使用工具栏格式化文本，或使用撤销/重做纠正错误。"
     },
     {
-      title: "4. 工作区与人格",
-      content: "在侧边栏切换“个人”或“团队”工作区以分类管理会话。在设置中更改 AI 的性格（如：程序员专家、创意作家）。"
+      title: "4. 人格与设置",
+      content: "在设置中关联账号、管理 API 密钥，以及更改 AI 的性格（如：程序员专家、创意作家）。"
     },
     {
       title: "5. 搜索与整理",

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Language } from '../types';
 import { UI_TEXT, validateInviteCode } from '../constants';
-import { OpenAIIcon, GoogleIcon } from './Icon';
+import { OpenAIIcon, GoogleIcon, BrainIcon } from './Icon';
 
 interface AuthScreenProps {
-  onAuthSuccess: (inviteCode: string, name: string, keys: { openai?: string, google?: string }) => void;
+  onAuthSuccess: (inviteCode: string, name: string, keys: { openai?: string, google?: string, anthropic?: string }) => void;
   language: Language;
 }
 
@@ -14,6 +14,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
   const [name, setName] = useState('');
   const [openaiKey, setOpenaiKey] = useState('');
   const [googleKey, setGoogleKey] = useState('');
+  const [anthropicKey, setAnthropicKey] = useState('');
   const [error, setError] = useState<string | null>(null);
   
   const t = UI_TEXT[language];
@@ -39,12 +40,13 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
     e.preventDefault();
     
     const validOpenAI = openaiKey.trim().startsWith('sk-');
-    // Basic validation for Google key (usually starts with AIza)
     const validGoogle = googleKey.trim().length > 0;
+    const validAnthropic = anthropicKey.trim().startsWith('sk-ant');
 
     onAuthSuccess(inviteCode, name, {
       openai: validOpenAI ? openaiKey.trim() : undefined,
-      google: validGoogle ? googleKey.trim() : undefined
+      google: validGoogle ? googleKey.trim() : undefined,
+      anthropic: validAnthropic ? anthropicKey.trim() : undefined
     });
   };
 
@@ -149,6 +151,18 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
                       onChange={(e) => setOpenaiKey(e.target.value)}
                       className="w-full bg-nexus-900/80 border border-nexus-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono placeholder-gray-600 text-sm"
                       placeholder={t.openaiKeyPlaceholder}
+                    />
+                  </div>
+
+                  {/* Anthropic Input */}
+                  <div className="relative">
+                    <div className="absolute left-3 top-3 text-gray-500"><BrainIcon /></div>
+                    <input 
+                      type="password" 
+                      value={anthropicKey}
+                      onChange={(e) => setAnthropicKey(e.target.value)}
+                      className="w-full bg-nexus-900/80 border border-nexus-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono placeholder-gray-600 text-sm"
+                      placeholder="Anthropic API Key (sk-ant-...)"
                     />
                   </div>
                 </div>

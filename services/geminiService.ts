@@ -3,12 +3,15 @@ import { GoogleGenAI, Modality } from "@google/genai";
 
 /**
  * Unified AI Service
- * Supports both OpenAI (via Fetch) and Google Gemini (via SDK).
+ * Supports OpenAI, Google Gemini, Anthropic, and CodeX
  */
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_IMAGE_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_TTS_URL = "https://api.openai.com/v1/audio/speech";
+
+// Anthropic messages endpoint
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
 const getOpenAIHeaders = (apiKey: string) => ({
   "Content-Type": "application/json",
@@ -37,19 +40,24 @@ export const streamGeminiResponse = async (
   apiKey?: string,
   options: GenerationOptions = {}
 ): Promise<StreamResult> => {
-  if (model.provider === 'openai') {
-    if (!apiKey) throw new Error("API Key missing for OpenAI");
+  if (!apiKey) throw new Error(`API Key missing for ${model.provider}`);
+
+  if (model.provider === 'openai' || model.provider === 'codex') {
     const text = await streamOpenAIResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey);
     return { text };
-  } else {
+  } 
+  else if (model.provider === 'anthropic') {
+    const text = await streamAnthropicResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey);
+    return { text };
+  } 
+  else {
     // Google uses passed API key
-    if (!apiKey) throw new Error("API Key missing for Google Gemini");
     return streamGoogleResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey, options);
   }
 };
 
 /**
- * OpenAI Implementation
+ * OpenAI / CodeX Implementation
  */
 const streamOpenAIResponse = async (
   modelId: string,
@@ -115,6 +123,83 @@ const streamOpenAIResponse = async (
 };
 
 /**
+ * Anthropic Implementation
+ */
+const streamAnthropicResponse = async (
+  modelId: string,
+  history: ChatMessage[],
+  newMessage: string,
+  systemInstruction: string,
+  onChunk: (text: string) => void,
+  apiKey: string
+): Promise<string> => {
+  const messages = [
+    ...history.map(m => ({ role: m.role === Role.USER ? "user" : "assistant", content: m.text })),
+    { role: "user", content: newMessage }
+  ];
+
+  const response = await fetch(ANTHROPIC_API_URL, {
+    method: "POST",
+    headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        // Note: Enabling dangerouslyAllowBrowser is required for client-side use if checking from browser directly, 
+        // but typically Anthropic enforces CORS. This is a best-effort client implementation.
+        "anthropic-dangerously-allow-browser": "true" 
+    },
+    body: JSON.stringify({
+      model: modelId,
+      messages: messages,
+      system: systemInstruction,
+      stream: true,
+      max_tokens: 4096
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error?.message || "Anthropic API Error");
+  }
+
+  if (!response.body) throw new Error("No response body");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let fullText = "";
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    const chunk = decoder.decode(value, { stream: true });
+    buffer += chunk;
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("event: ")) {
+          // Skip event type lines
+          continue;
+      }
+      if (trimmed.startsWith("data: ")) {
+        try {
+          const json = JSON.parse(trimmed.slice(6));
+          if (json.type === 'content_block_delta' && json.delta?.text) {
+             const textPart = json.delta.text;
+             fullText += textPart;
+             onChunk(fullText);
+          }
+        } catch (e) { /* ignore */ }
+      }
+    }
+  }
+  return fullText;
+};
+
+/**
  * Google Gemini Implementation
  */
 const streamGoogleResponse = async (
@@ -140,8 +225,6 @@ const streamGoogleResponse = async (
 
   // 1. Thinking Config
   if (options.useThinking) {
-    // Only 2.5 series supports thinking config properly in this context usually, 
-    // or specific thinking models.
     if (modelId.includes('gemini-2.5') || modelId.includes('gemini-3')) {
        config.thinkingConfig = { thinkingBudget: 1024 * 4 }; // 4k tokens for reasoning
     }
@@ -150,7 +233,6 @@ const streamGoogleResponse = async (
   // 2. Tools (Search)
   if (options.useSearch) {
     config.tools = [{ googleSearch: {} }];
-    // Google Search cannot be used with responseMimeType/Schema
   }
 
   const chat = ai.chats.create({
@@ -216,7 +298,6 @@ export const generateImage = async (
       imageConfig: { imageSize: "1K" } // forcing 1K for now as 2K/4K is specific to Pro
     };
     if (imageSize === "2K") config.imageConfig.imageSize = "2K";
-    // if (imageSize === "4K") config.imageConfig.imageSize = "4K"; // Only if model supports it
 
     const response = await ai.models.generateContent({
       model: model.id,

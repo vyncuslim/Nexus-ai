@@ -175,7 +175,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
         <div className={`
           relative px-4 py-3 rounded-2xl shadow-sm border group flex flex-col min-w-0
           ${isUser 
-            ? 'bg-nexus-700 text-white rounded-tr-sm border-transparent' 
+            ? 'bg-slate-500 text-white rounded-tr-sm border-transparent' 
             : isError 
               ? 'bg-red-900/20 text-red-200 border-red-500/50 rounded-tl-sm' 
               : 'bg-nexus-800 text-gray-100 rounded-tl-sm border-nexus-700'}

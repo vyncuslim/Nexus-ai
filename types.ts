@@ -39,7 +39,7 @@ export interface ChatMessage {
 }
 
 export type ModelCategory = 'text' | 'image' | 'video';
-export type AIProvider = 'openai' | 'google';
+export type AIProvider = 'openai' | 'google' | 'anthropic' | 'codex';
 
 export interface ModelConfig {
   id: string;
@@ -65,9 +65,8 @@ export interface User {
   email: string;
   name: string;
   avatar?: string; // Base64 string
+  isGoogleLinked?: boolean;
 }
-
-export type WorkspaceType = 'personal' | 'team';
 
 export interface Persona {
   id: string;
