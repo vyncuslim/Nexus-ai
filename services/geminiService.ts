@@ -42,8 +42,9 @@ export const streamGeminiResponse = async (
     const text = await streamOpenAIResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey);
     return { text };
   } else {
-    // Google uses process.env.API_KEY directly
-    return streamGoogleResponse(model.id, history, newMessage, systemInstruction, onChunk, options);
+    // Google uses passed API key
+    if (!apiKey) throw new Error("API Key missing for Google Gemini");
+    return streamGoogleResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey, options);
   }
 };
 
@@ -122,9 +123,10 @@ const streamGoogleResponse = async (
   newMessage: string,
   systemInstruction: string,
   onChunk: (text: string) => void,
+  apiKey: string,
   options: GenerationOptions
 ): Promise<StreamResult> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   // Transform history to Google format
   const googleHistory = history.map(msg => ({
@@ -140,9 +142,6 @@ const streamGoogleResponse = async (
   if (options.useThinking) {
     // Only 2.5 series supports thinking config properly in this context usually, 
     // or specific thinking models.
-    // The prompt says "gemini-3-pro-preview" supports 32768, 2.5 flash 24576.
-    // We'll set a safe budget if the user explicitly asks for thinking.
-    // Note: thinkingConfig is only available for 2.5 series and 3-pro per docs provided.
     if (modelId.includes('gemini-2.5') || modelId.includes('gemini-3')) {
        config.thinkingConfig = { thinkingBudget: 1024 * 4 }; // 4k tokens for reasoning
     }
@@ -172,8 +171,6 @@ const streamGoogleResponse = async (
       onChunk(fullText);
     }
     
-    // Check for grounding metadata in chunks
-    // The SDK types might require casting or checking properties loosely if not perfectly typed yet
     const candidate = chunk.candidates?.[0];
     if (candidate?.groundingMetadata) {
       groundingMetadata = candidate.groundingMetadata as GroundingMetadata;
@@ -192,8 +189,9 @@ export const generateImage = async (
   imageSize: string = "1024x1024", 
   apiKey?: string
 ): Promise<string> => {
+  if (!apiKey) throw new Error("API Key missing");
+
   if (model.provider === 'openai') {
-    if (!apiKey) throw new Error("API Key missing for OpenAI");
     // DALL-E 3
     const response = await fetch(OPENAI_IMAGE_URL, {
       method: "POST",
@@ -212,7 +210,7 @@ export const generateImage = async (
 
   } else {
     // Gemini Image
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     // Map simplified size to Google config if needed, or default
     const config: any = {
       imageConfig: { imageSize: "1K" } // forcing 1K for now as 2K/4K is specific to Pro
@@ -245,9 +243,9 @@ export const generateVideo = async (
   aspectRatio: string = "16:9", 
   apiKey?: string
 ): Promise<string> => {
-  // if (model.provider === 'openai') throw new Error("OpenAI does not support Video generation yet.");
-  // Ignore apiKey arg, use env
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  if (!apiKey) throw new Error("API Key missing for Google Video");
+  
+  const ai = new GoogleGenAI({ apiKey });
   
   let operation = await ai.models.generateVideos({
     model: model.id,
@@ -269,7 +267,7 @@ export const generateVideo = async (
   if (!videoUri) throw new Error("Video generation failed");
 
   // Fetch the actual bytes using the key
-  const res = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
+  const res = await fetch(`${videoUri}&key=${apiKey}`);
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 };
@@ -278,8 +276,9 @@ export const generateVideo = async (
  * Speech Generation (Unified)
  */
 export const generateSpeech = async (text: string, apiKey?: string, provider: AIProvider = 'google'): Promise<string> => {
+  if (!apiKey) throw new Error("API Key missing");
+
   if (provider === 'openai') {
-    if (!apiKey) throw new Error("API Key missing for OpenAI");
     const response = await fetch(OPENAI_TTS_URL, {
       method: "POST",
       headers: getOpenAIHeaders(apiKey),
@@ -290,7 +289,7 @@ export const generateSpeech = async (text: string, apiKey?: string, provider: AI
     return blobToBase64(blob);
   } else {
     // Google TTS
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: text }] }],

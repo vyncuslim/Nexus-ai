@@ -14,6 +14,7 @@ function App() {
   // --- Persistent State Keys ---
   const STORAGE_KEY_USER = 'nexus_user_v2';
   const STORAGE_KEY_OPENAI_KEY = 'nexus_openai_key';
+  const STORAGE_KEY_GOOGLE_KEY = 'nexus_google_key';
   const STORAGE_KEY_INVITE_CODE = 'nexus_invite_code';
   const STORAGE_KEY_SESSIONS_PREFIX = 'nexus_sessions_';
   const STORAGE_KEY_PREFS = 'nexus_preferences';
@@ -21,6 +22,7 @@ function App() {
   // --- State ---
   const [user, setUser] = useState<User | null>(null);
   const [openaiKey, setOpenaiKey] = useState<string | null>(null);
+  const [googleKey, setGoogleKey] = useState<string | null>(null);
   const [language, setLanguage] = useState<Language>('en');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
@@ -74,6 +76,7 @@ function App() {
     // Load Auth
     const storedUser = localStorage.getItem(STORAGE_KEY_USER);
     const storedOpenAI = localStorage.getItem(STORAGE_KEY_OPENAI_KEY);
+    const storedGoogle = localStorage.getItem(STORAGE_KEY_GOOGLE_KEY);
     const storedInvite = localStorage.getItem(STORAGE_KEY_INVITE_CODE);
 
     if (storedUser && storedInvite) {
@@ -81,7 +84,7 @@ function App() {
         const u = JSON.parse(storedUser);
         setUser(u);
         if (storedOpenAI) setOpenaiKey(storedOpenAI);
-        // Load sessions will be called in the next effect when user is set
+        if (storedGoogle) setGoogleKey(storedGoogle);
       } catch (e) { console.error(e); }
     }
   }, []);
@@ -210,6 +213,10 @@ function App() {
       setOpenaiKey(keys.openai);
       localStorage.setItem(STORAGE_KEY_OPENAI_KEY, keys.openai);
     }
+    if (keys.google) {
+      setGoogleKey(keys.google);
+      localStorage.setItem(STORAGE_KEY_GOOGLE_KEY, keys.google);
+    }
     
     localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(u));
     localStorage.setItem(STORAGE_KEY_INVITE_CODE, inviteCode);
@@ -225,12 +232,14 @@ function App() {
   const handleLogout = () => {
     setUser(null);
     setOpenaiKey(null);
+    setGoogleKey(null);
     setSessions([], true);
     setCurrentSessionId(null);
     
     // Clear all auth data
     localStorage.removeItem(STORAGE_KEY_USER);
     localStorage.removeItem(STORAGE_KEY_OPENAI_KEY);
+    localStorage.removeItem(STORAGE_KEY_GOOGLE_KEY);
     localStorage.removeItem(STORAGE_KEY_INVITE_CODE);
     
     setSidebarOpen(false);
@@ -288,13 +297,23 @@ function App() {
     setIsListening(true);
   };
 
+  // --- Helpers ---
+  const getActiveKey = (provider: 'openai' | 'google') => {
+    // Prefer user key, fallback to env for Google if available (legacy support)
+    if (provider === 'openai') return openaiKey;
+    if (provider === 'google') return googleKey || process.env.API_KEY;
+    return null;
+  };
+
   // --- Prompt Optimization Logic ---
   const handleOptimizePrompt = async () => {
     if (!inputValue.trim() || isOptimizing) return;
+    const apiKey = getActiveKey('google');
+    if (!apiKey) return;
     
     setIsOptimizing(true);
     try {
-       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+       const ai = new GoogleGenAI({ apiKey });
        const prompt = language === 'zh' 
           ? `请重写并优化以下提示词，使其在 AI 生成内容时更加有效和详细。直接返回优化后的提示词，不要包含其他解释：\n\n${inputValue}`
           : `Rewrite and optimize the following prompt to be more effective and detailed for AI generation. Return ONLY the optimized prompt with no explanation:\n\n${inputValue}`;
@@ -370,10 +389,6 @@ function App() {
     setInputValue(e.target.value);
   };
 
-  const getActiveKey = (provider: 'openai' | 'google') => {
-    return provider === 'openai' ? openaiKey : process.env.API_KEY;
-  };
-
   const handleSummarize = async () => {
     if (!currentSessionId || isLoading || !user) return;
     const key = getActiveKey('openai') || getActiveKey('google');
@@ -415,6 +430,9 @@ function App() {
         ? GEMINI_MODELS.find(m => m.id === 'gpt-3.5-turbo')!
         : GEMINI_MODELS.find(m => m.id === 'gemini-2.5-flash')!;
         
+      const apiKey = getActiveKey(model.provider);
+      if (!apiKey) throw new Error(`Missing Key for ${model.provider}`);
+
       await streamGeminiResponse(
         model,
         [],
@@ -429,7 +447,7 @@ function App() {
                return news;
             }, true);
         },
-        getActiveKey(model.provider)!
+        apiKey
       );
       
       const finalSessions = sessions.map(s => {
@@ -592,7 +610,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, language, imageSize, videoAspectRatio, setSessions, setInputValue, currentWorkspace, currentPersonaId, useSearch, useThinking]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, googleKey, language, imageSize, videoAspectRatio, setSessions, setInputValue, currentWorkspace, currentPersonaId, useSearch, useThinking]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -609,7 +627,7 @@ function App() {
 
   const t = UI_TEXT[language];
 
-  // Logic Change: Allow if user is set. Google is assumed valid.
+  // Logic Change: Allow if user is set. Google is assumed valid if env or user key exists.
   if (!user) {
     return <AuthScreen onAuthSuccess={handleAuthSuccess} language={language} />;
   }
