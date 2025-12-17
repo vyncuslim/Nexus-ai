@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Language } from '../types';
 import { UI_TEXT, validateInviteCode } from '../constants';
-import { GoogleIcon, OpenAIIcon } from './Icon';
+import { OpenAIIcon, GoogleIcon, CheckCircleIcon } from './Icon';
 
 interface AuthScreenProps {
   onAuthSuccess: (inviteCode: string, name: string, keys: { openai?: string, google?: string }) => void;
@@ -13,7 +13,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
   const [inviteCode, setInviteCode] = useState('');
   const [name, setName] = useState('');
   const [openaiKey, setOpenaiKey] = useState('');
-  const [googleKey, setGoogleKey] = useState('');
   const [error, setError] = useState<string | null>(null);
   
   const t = UI_TEXT[language];
@@ -37,19 +36,13 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
 
   const handleKeySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Validate that at least one key is present if we want to enforce it, or just pass empty
-    // Basic validation
+    
     const validOpenAI = openaiKey.trim().startsWith('sk-');
-    const validGoogle = googleKey.trim().length > 10; // Simple length check
 
-    if (!validOpenAI && !validGoogle) {
-      setError(t.keysHelp);
-      return;
-    }
-
+    // Google key is handled via env, so we don't ask for it. 
+    // We just pass the OpenAI key if provided.
     onAuthSuccess(inviteCode, name, {
       openai: validOpenAI ? openaiKey.trim() : undefined,
-      google: validGoogle ? googleKey.trim() : undefined
     });
   };
 
@@ -133,6 +126,21 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
              {step === 3 && (
               <form onSubmit={handleKeySubmit} className="space-y-4">
                 <div className="space-y-3">
+                  {/* Google Status Indicator */}
+                  <div className="p-3 bg-emerald-900/20 border border-emerald-500/20 rounded-xl flex items-center justify-between">
+                     <div className="flex items-center gap-3">
+                       <div className="bg-emerald-500/20 p-1.5 rounded-lg text-emerald-500">
+                         <GoogleIcon />
+                       </div>
+                       <div className="flex flex-col">
+                         <span className="text-sm font-semibold text-emerald-200">Gemini Active</span>
+                         <span className="text-[10px] text-emerald-400/60">System Optimized</span>
+                       </div>
+                     </div>
+                     <CheckCircleIcon />
+                  </div>
+
+                  {/* OpenAI Input */}
                   <div className="relative">
                     <div className="absolute left-3 top-3 text-gray-500"><OpenAIIcon /></div>
                     <input 
@@ -143,21 +151,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
                       placeholder={t.openaiKeyPlaceholder}
                     />
                   </div>
-                  
-                  <div className="relative">
-                     <div className="absolute left-3 top-3 text-gray-500"><GoogleIcon /></div>
-                     <input 
-                      type="password" 
-                      value={googleKey}
-                      onChange={(e) => setGoogleKey(e.target.value)}
-                      className="w-full bg-nexus-900/80 border border-nexus-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono placeholder-gray-600 text-sm"
-                      placeholder={t.googleKeyPlaceholder}
-                    />
-                  </div>
                 </div>
 
                 <p className="text-[10px] text-gray-500 text-center">
-                  {t.keysHelp}
+                  {t.optional}
                 </p>
                  <button 
                   type="submit"
