@@ -122,7 +122,9 @@ export const UI_TEXT = {
     keysHelp: "Enter at least one API key to proceed.",
     feedback: "Feedback",
     userGuide: "User Guide",
-    contactUs: "Contact Us"
+    contactUs: "Contact Us",
+    undo: "Undo",
+    redo: "Redo"
   },
   zh: {
     newChat: "新建会话",
@@ -168,7 +170,9 @@ export const UI_TEXT = {
     keysHelp: "请至少输入一个 API 密钥以继续。",
     feedback: "反馈建议",
     userGuide: "使用说明",
-    contactUs: "联系我们"
+    contactUs: "联系我们",
+    undo: "撤销",
+    redo: "重做"
   }
 };
 

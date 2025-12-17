@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { PlusIcon, GlobeIcon, LogOutIcon, TrashIcon, CameraIcon, UploadIcon, UserIcon, MailIcon, HelpIcon } from './Icon';
+import { PlusIcon, GlobeIcon, LogOutIcon, TrashIcon, CameraIcon, UploadIcon, UserIcon, MailIcon, HelpIcon, UndoIcon, RedoIcon } from './Icon';
 import { ChatSession, User, Language } from '../types';
 import { UI_TEXT, CONTACT_EMAIL, USER_GUIDE } from '../constants';
 
@@ -15,6 +15,10 @@ interface SidebarProps {
   onLogout: () => void;
   language: Language;
   onToggleLanguage: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -28,7 +32,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   onUpdateUserAvatar,
   onLogout,
   language,
-  onToggleLanguage
+  onToggleLanguage,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo
 }) => {
   const t = UI_TEXT[language];
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -233,6 +241,28 @@ const Sidebar: React.FC<SidebarProps> = ({
           {/* Bottom Controls */}
           <div className="p-4 bg-nexus-900 border-t border-nexus-700 space-y-2">
             
+            {/* History Controls (Undo/Redo for sessions) */}
+            <div className="flex gap-2 mb-2">
+              <button 
+                onClick={onUndo}
+                disabled={!canUndo}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-nexus-800 rounded-lg transition-colors text-xs font-medium border border-transparent ${canUndo ? 'hover:bg-nexus-700 text-gray-400 hover:text-white hover:border-nexus-600' : 'opacity-50 cursor-not-allowed text-gray-600'}`}
+                title={t.undo}
+              >
+                <UndoIcon />
+                {t.undo}
+              </button>
+              <button 
+                onClick={onRedo}
+                disabled={!canRedo}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-nexus-800 rounded-lg transition-colors text-xs font-medium border border-transparent ${canRedo ? 'hover:bg-nexus-700 text-gray-400 hover:text-white hover:border-nexus-600' : 'opacity-50 cursor-not-allowed text-gray-600'}`}
+                title={t.redo}
+              >
+                <RedoIcon />
+                {t.redo}
+              </button>
+            </div>
+
             {/* Action Buttons Row */}
             <div className="flex gap-2 mb-2">
               <a 

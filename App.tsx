@@ -563,6 +563,10 @@ function App() {
         onLogout={handleLogout}
         language={language}
         onToggleLanguage={toggleLanguage}
+        onUndo={sessionsControl.undo}
+        onRedo={sessionsControl.redo}
+        canUndo={sessionsControl.canUndo}
+        canRedo={sessionsControl.canRedo}
       />
 
       <main className="flex-1 flex flex-col relative w-full h-full transition-all">
