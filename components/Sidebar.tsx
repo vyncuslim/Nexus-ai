@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { PlusIcon, GlobeIcon, LogOutIcon, TrashIcon, CameraIcon, UploadIcon, UserIcon, HelpIcon, UndoIcon, RedoIcon, SearchIcon, SettingsIcon, CheckCircleIcon, GoogleIcon, OpenAIIcon } from './Icon';
+import { PlusIcon, GlobeIcon, LogOutIcon, TrashIcon, CameraIcon, UploadIcon, UserIcon, HelpIcon, UndoIcon, RedoIcon, SearchIcon, SettingsIcon, CheckCircleIcon, GoogleIcon, OpenAIIcon, BrainIcon } from './Icon';
 import { ChatSession, User, Language, Persona } from '../types';
 import { UI_TEXT, CONTACT_EMAIL, USER_GUIDE, PERSONAS } from '../constants';
 
@@ -470,8 +470,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                      </div>
                      <div className="relative">
                        <div className="absolute left-3 top-3 text-gray-500">
-                         {/* Anthropic Icon placeholder - generic AI chip */}
-                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zm0 9l2-5-2 1V11zm0 2.2V22l10-5V7l-10 5zm-2-5.2l-2 5 2-1V8zm-8 4v5l10 5v-8.8l-10-1.2z"/></svg>
+                         <BrainIcon />
                        </div>
                        <input 
                          type="password"

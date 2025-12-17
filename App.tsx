@@ -10,6 +10,8 @@ import { useHistory } from './hooks/useHistory';
 import { v4 as uuidv4 } from 'uuid';
 import { GoogleGenAI } from "@google/genai";
 
+declare const google: any;
+
 function App() {
   // --- Persistent State Keys ---
   const STORAGE_KEY_USER = 'nexus_user_v2';
@@ -206,11 +208,12 @@ function App() {
   };
 
   // --- Auth & Settings Logic ---
-  const handleAuthSuccess = (inviteCode: string, name: string, keys: { openai?: string, google?: string, anthropic?: string }) => {
+  const handleAuthSuccess = (inviteCode: string, name: string, keys: { openai?: string, google?: string, anthropic?: string }, avatar?: string) => {
     const u: User = {
       id: btoa(inviteCode + name),
       name: name,
-      email: inviteCode
+      email: inviteCode,
+      avatar: avatar
     };
 
     setUser(u);
@@ -257,14 +260,12 @@ function App() {
     if (!user) return;
 
     // 1. Try AI Studio (Project IDX / Veo / SF environment)
-    // This is the "real" integration if available in the host environment.
     if ((window as any).aistudio) {
         try {
             const hasKey = await (window as any).aistudio.hasSelectedApiKey();
             if (!hasKey) {
                await (window as any).aistudio.openSelectKey();
             }
-            // Double check if successful
             if (await (window as any).aistudio.hasSelectedApiKey()) {
                  completeLink();
                  return;
@@ -272,40 +273,69 @@ function App() {
         } catch(e) { console.error("AI Studio Auth Failed", e); }
     }
 
-    // 2. Fallback: Simulated OAuth Flow for UI realism (Web App)
-    // Since we don't have a backend to handle the redirect, we simulate the pop-up interaction.
-    const width = 500;
-    const height = 600;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-    
-    // Open a popup to Google Login (or a placeholder if we can't actually auth)
-    const popup = window.open(
-        'https://accounts.google.com/signin/v2/identifier?flowName=GlifWebSignIn&flowEntry=ServiceLogin', 
-        'Google Auth', 
-        `width=${width},height=${height},top=${top},left=${left}`
-    );
-
-    if (popup) {
-        // Poll for closure to simulate "completion"
-        const timer = setInterval(() => {
-            if (popup.closed) {
-                clearInterval(timer);
-                // User closed window, we assume success or cancellation. 
-                // For the demo purpose, we treat it as success if it stayed open for a bit.
+    // 2. Google Identity Services (GIS) Flow
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: 'YOUR_CLIENT_ID', // In production, use process.env.GOOGLE_CLIENT_ID
+        scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.access_token) {
+            try {
+              // Fetch profile to update avatar/email if needed
+              const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+              });
+              const data = await res.json();
+              
+              // Update user state with Google data
+              const updatedUser = { 
+                ...user, 
+                isGoogleLinked: true,
+                avatar: user.avatar || data.picture, // Only update if no avatar set
+                name: user.name === "Guest" && data.name ? data.name : user.name
+              };
+              
+              setUser(updatedUser);
+              localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
+              alert("Google Account successfully linked!");
+            } catch (err) {
+              console.error("Failed to fetch user info", err);
+              completeLink(); // Fallback mark as linked even if fetch fails
             }
-        }, 500);
+          }
+        },
+      });
+      client.requestAccessToken();
+    } catch (e) {
+      console.warn("GIS not loaded, falling back to simulation", e);
+      // Fallback: Simulated OAuth Flow
+      const width = 500;
+      const height = 600;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const popup = window.open(
+          'https://accounts.google.com/signin/v2/identifier?flowName=GlifWebSignIn&flowEntry=ServiceLogin', 
+          'Google Auth', 
+          `width=${width},height=${height},top=${top},left=${left}`
+      );
 
-        // Auto-close simulation after 2.5s to mimic a successful redirect back
-        setTimeout(() => {
-            if (!popup.closed) {
-                popup.close();
-                completeLink();
-            }
-        }, 2500);
-    } else {
-         // Popup blocked, just link immediately
-         completeLink();
+      if (popup) {
+          const timer = setInterval(() => {
+              if (popup.closed) {
+                  clearInterval(timer);
+              }
+          }, 500);
+
+          setTimeout(() => {
+              if (!popup.closed) {
+                  popup.close();
+                  completeLink();
+              }
+          }, 2500);
+      } else {
+           completeLink();
+      }
     }
   };
 

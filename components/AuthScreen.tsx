@@ -3,8 +3,10 @@ import { Language } from '../types';
 import { UI_TEXT, validateInviteCode } from '../constants';
 import { OpenAIIcon, GoogleIcon, BrainIcon } from './Icon';
 
+declare const google: any;
+
 interface AuthScreenProps {
-  onAuthSuccess: (inviteCode: string, name: string, keys: { openai?: string, google?: string, anthropic?: string }) => void;
+  onAuthSuccess: (inviteCode: string, name: string, keys: { openai?: string, google?: string, anthropic?: string }, avatar?: string) => void;
   language: Language;
 }
 
@@ -12,10 +14,14 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Invite, 2: Name, 3: Keys
   const [inviteCode, setInviteCode] = useState('');
   const [name, setName] = useState('');
+  const [avatar, setAvatar] = useState<string | undefined>(undefined);
+  
   const [openaiKey, setOpenaiKey] = useState('');
   const [googleKey, setGoogleKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
+  
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
   const t = UI_TEXT[language];
 
@@ -36,6 +42,64 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
     }
   };
 
+  const handleGoogleSignIn = () => {
+    // 1. Validate Invite Code First
+    if (!validateInviteCode(inviteCode)) {
+      setError(t.authErrorInvalidCode);
+      return;
+    }
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      // 2. Initialize OAuth 2.0 Code Flow
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: 'YOUR_CLIENT_ID', // In a real app, this comes from env. Using fallback for demo.
+        scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.access_token) {
+            try {
+              // 3. Fetch User Info
+              const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+              });
+              const userData = await userInfoResponse.json();
+              
+              // 4. Update State
+              if (userData.name) setName(userData.name);
+              if (userData.picture) setAvatar(userData.picture);
+              
+              // 5. Skip Name Step
+              setIsLoading(false);
+              setStep(3);
+            } catch (err) {
+              console.error("Failed to fetch user info", err);
+              setError("Google Sign-In failed to retrieve user data.");
+              setIsLoading(false);
+            }
+          }
+        },
+        error_callback: (err: any) => {
+            console.error("Google Auth Error", err);
+            setError("Google Sign-In was cancelled or failed.");
+            setIsLoading(false);
+        }
+      });
+      
+      // 6. Trigger Flow
+      client.requestAccessToken();
+
+    } catch (e) {
+      // Fallback for demo/dev environment where Google Client ID might not be set
+      console.warn("Google Auth API not loaded or configured. Using mock.", e);
+      setTimeout(() => {
+        setName("Google User");
+        setStep(3);
+        setIsLoading(false);
+      }, 1000);
+    }
+  };
+
   const handleKeySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -47,7 +111,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
       openai: validOpenAI ? openaiKey.trim() : undefined,
       google: validGoogle ? googleKey.trim() : undefined,
       anthropic: validAnthropic ? anthropicKey.trim() : undefined
-    });
+    }, avatar);
   };
 
   return (
@@ -86,23 +150,44 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
 
             {/* STEP 1: INVITE CODE */}
             {step === 1 && (
-              <form onSubmit={handleInviteSubmit} className="space-y-4">
-                <input 
-                  type="text" 
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                  className="w-full bg-nexus-900/80 border border-nexus-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono placeholder-gray-600 text-sm text-center uppercase tracking-widest"
-                  placeholder={t.invitePlaceholder}
-                  autoFocus
-                />
+              <div className="space-y-4">
+                <form onSubmit={handleInviteSubmit} className="space-y-4">
+                  <input 
+                    type="text" 
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    className="w-full bg-nexus-900/80 border border-nexus-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono placeholder-gray-600 text-sm text-center uppercase tracking-widest"
+                    placeholder={t.invitePlaceholder}
+                    autoFocus
+                  />
+                  <button 
+                    type="submit"
+                    disabled={!inviteCode}
+                    className="w-full py-3.5 rounded-xl font-bold tracking-wide bg-emerald-600 text-white shadow-lg hover:bg-emerald-500 transition-all"
+                  >
+                    {t.nextBtn}
+                  </button>
+                </form>
+
+                <div className="relative flex py-2 items-center">
+                    <div className="flex-grow border-t border-nexus-700"></div>
+                    <span className="flex-shrink-0 mx-4 text-gray-500 text-xs">OR</span>
+                    <div className="flex-grow border-t border-nexus-700"></div>
+                </div>
+
                 <button 
-                  type="submit"
-                  disabled={!inviteCode}
-                  className="w-full py-3.5 rounded-xl font-bold tracking-wide bg-emerald-600 text-white shadow-lg hover:bg-emerald-500 transition-all"
+                  onClick={handleGoogleSignIn}
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-xl font-bold tracking-wide bg-white text-gray-800 shadow-lg hover:bg-gray-100 transition-all flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  {t.nextBtn}
+                  {isLoading ? (
+                    <span className="w-5 h-5 border-2 border-gray-600 border-t-transparent rounded-full animate-spin"></span>
+                  ) : (
+                    <GoogleIcon />
+                  )}
+                  <span className="text-sm">Sign in with Google</span>
                 </button>
-              </form>
+              </div>
             )}
 
             {/* STEP 2: NAME */}
