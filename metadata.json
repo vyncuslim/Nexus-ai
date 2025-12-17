@@ -2,6 +2,7 @@
   "name": "Nexus Core AI",
   "description": "The central neural hub of your AI product matrix. A high-performance, responsive React web application utilizing Google's Gemini API for intelligent conversation.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone"
   ]
 }

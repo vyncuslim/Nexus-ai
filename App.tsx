@@ -14,7 +14,6 @@ function App() {
   // --- Persistent State Keys ---
   const STORAGE_KEY_USER = 'nexus_user_v2';
   const STORAGE_KEY_OPENAI_KEY = 'nexus_openai_key';
-  const STORAGE_KEY_GOOGLE_KEY = 'nexus_google_key';
   const STORAGE_KEY_INVITE_CODE = 'nexus_invite_code';
   const STORAGE_KEY_SESSIONS_PREFIX = 'nexus_sessions_';
   const STORAGE_KEY_PREFS = 'nexus_preferences';
@@ -22,7 +21,6 @@ function App() {
   // --- State ---
   const [user, setUser] = useState<User | null>(null);
   const [openaiKey, setOpenaiKey] = useState<string | null>(null);
-  const [googleKey, setGoogleKey] = useState<string | null>(null);
   const [language, setLanguage] = useState<Language>('en');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
@@ -72,15 +70,13 @@ function App() {
     // Load Auth
     const storedUser = localStorage.getItem(STORAGE_KEY_USER);
     const storedOpenAI = localStorage.getItem(STORAGE_KEY_OPENAI_KEY);
-    const storedGoogle = localStorage.getItem(STORAGE_KEY_GOOGLE_KEY);
     const storedInvite = localStorage.getItem(STORAGE_KEY_INVITE_CODE);
 
-    if (storedUser && storedInvite && (storedOpenAI || storedGoogle)) {
+    if (storedUser && storedInvite) {
       try {
         const u = JSON.parse(storedUser);
         setUser(u);
         if (storedOpenAI) setOpenaiKey(storedOpenAI);
-        if (storedGoogle) setGoogleKey(storedGoogle);
         // Load sessions will be called in the next effect when user is set
       } catch (e) { console.error(e); }
     }
@@ -210,10 +206,6 @@ function App() {
       setOpenaiKey(keys.openai);
       localStorage.setItem(STORAGE_KEY_OPENAI_KEY, keys.openai);
     }
-    if (keys.google) {
-      setGoogleKey(keys.google);
-      localStorage.setItem(STORAGE_KEY_GOOGLE_KEY, keys.google);
-    }
     
     localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(u));
     localStorage.setItem(STORAGE_KEY_INVITE_CODE, inviteCode);
@@ -229,14 +221,12 @@ function App() {
   const handleLogout = () => {
     setUser(null);
     setOpenaiKey(null);
-    setGoogleKey(null);
     setSessions([], true);
     setCurrentSessionId(null);
     
     // Clear all auth data
     localStorage.removeItem(STORAGE_KEY_USER);
     localStorage.removeItem(STORAGE_KEY_OPENAI_KEY);
-    localStorage.removeItem(STORAGE_KEY_GOOGLE_KEY);
     localStorage.removeItem(STORAGE_KEY_INVITE_CODE);
     
     setSidebarOpen(false);
@@ -296,11 +286,11 @@ function App() {
 
   // --- Prompt Optimization Logic ---
   const handleOptimizePrompt = async () => {
-    if (!inputValue.trim() || isOptimizing || !googleKey) return;
+    if (!inputValue.trim() || isOptimizing) return;
     
     setIsOptimizing(true);
     try {
-       const ai = new GoogleGenAI({ apiKey: googleKey });
+       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
        const prompt = language === 'zh' 
           ? `请重写并优化以下提示词，使其在 AI 生成内容时更加有效和详细。直接返回优化后的提示词，不要包含其他解释：\n\n${inputValue}`
           : `Rewrite and optimize the following prompt to be more effective and detailed for AI generation. Return ONLY the optimized prompt with no explanation:\n\n${inputValue}`;
@@ -377,13 +367,13 @@ function App() {
   };
 
   const getActiveKey = (provider: 'openai' | 'google') => {
-    return provider === 'openai' ? openaiKey : googleKey;
+    return provider === 'openai' ? openaiKey : process.env.API_KEY;
   };
 
   const handleSummarize = async () => {
     if (!currentSessionId || isLoading || !user) return;
-    const key = getActiveKey('openai') || getActiveKey('google'); // Use whatever key is available
-    if (!key) return; // Prompt user?
+    const key = getActiveKey('openai') || getActiveKey('google');
+    if (!key) return; 
 
     const msgs = getCurrentMessages();
     if (msgs.length === 0) return;
@@ -469,7 +459,7 @@ function App() {
     
     const apiKey = getActiveKey(selectedModel.provider);
     if (!apiKey) {
-      alert(`Missing API Key for ${selectedModel.provider}. Please log out and enter the key.`);
+      alert(`Missing API Key for ${selectedModel.provider}.`);
       return;
     }
 
@@ -590,7 +580,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, googleKey, language, imageSize, videoAspectRatio, setSessions, setInputValue, currentWorkspace, currentPersonaId]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, language, imageSize, videoAspectRatio, setSessions, setInputValue, currentWorkspace, currentPersonaId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -607,7 +597,8 @@ function App() {
 
   const t = UI_TEXT[language];
 
-  if (!user || (!openaiKey && !googleKey)) {
+  // Logic Change: Allow if user is set. Google is assumed valid.
+  if (!user) {
     return <AuthScreen onAuthSuccess={handleAuthSuccess} language={language} />;
   }
 

@@ -26,12 +26,12 @@ export const streamGeminiResponse = async (
   onChunk: (text: string) => void,
   apiKey?: string
 ): Promise<string> => {
-  if (!apiKey) throw new Error("API Key missing");
-
   if (model.provider === 'openai') {
+    if (!apiKey) throw new Error("API Key missing for OpenAI");
     return streamOpenAIResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey);
   } else {
-    return streamGoogleResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey);
+    // Google uses process.env.API_KEY directly
+    return streamGoogleResponse(model.id, history, newMessage, systemInstruction, onChunk);
   }
 };
 
@@ -109,10 +109,9 @@ const streamGoogleResponse = async (
   history: ChatMessage[],
   newMessage: string,
   systemInstruction: string,
-  onChunk: (text: string) => void,
-  apiKey: string
+  onChunk: (text: string) => void
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   // Transform history to Google format
   const googleHistory = history.map(msg => ({
@@ -148,9 +147,8 @@ export const generateImage = async (
   imageSize: string = "1024x1024", 
   apiKey?: string
 ): Promise<string> => {
-  if (!apiKey) throw new Error("API Key missing");
-
   if (model.provider === 'openai') {
+    if (!apiKey) throw new Error("API Key missing for OpenAI");
     // DALL-E 3
     const response = await fetch(OPENAI_IMAGE_URL, {
       method: "POST",
@@ -169,7 +167,7 @@ export const generateImage = async (
 
   } else {
     // Gemini Image
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     // Map simplified size to Google config if needed, or default
     const config: any = {
       imageConfig: { imageSize: "1K" } // forcing 1K for now as 2K/4K is specific to Pro
@@ -202,10 +200,9 @@ export const generateVideo = async (
   aspectRatio: string = "16:9", 
   apiKey?: string
 ): Promise<string> => {
-  if (!apiKey) throw new Error("API Key missing");
-  if (model.provider === 'openai') throw new Error("OpenAI does not support Video generation yet.");
-
-  const ai = new GoogleGenAI({ apiKey });
+  // if (model.provider === 'openai') throw new Error("OpenAI does not support Video generation yet.");
+  // Ignore apiKey arg, use env
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   let operation = await ai.models.generateVideos({
     model: model.id,
@@ -227,7 +224,7 @@ export const generateVideo = async (
   if (!videoUri) throw new Error("Video generation failed");
 
   // Fetch the actual bytes using the key
-  const res = await fetch(`${videoUri}&key=${apiKey}`);
+  const res = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 };
@@ -236,9 +233,8 @@ export const generateVideo = async (
  * Speech Generation (Unified)
  */
 export const generateSpeech = async (text: string, apiKey?: string, provider: AIProvider = 'google'): Promise<string> => {
-  if (!apiKey) throw new Error("API Key missing");
-
   if (provider === 'openai') {
+    if (!apiKey) throw new Error("API Key missing for OpenAI");
     const response = await fetch(OPENAI_TTS_URL, {
       method: "POST",
       headers: getOpenAIHeaders(apiKey),
@@ -249,7 +245,7 @@ export const generateSpeech = async (text: string, apiKey?: string, provider: AI
     return blobToBase64(blob);
   } else {
     // Google TTS
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: text }] }],
