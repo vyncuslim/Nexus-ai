@@ -92,7 +92,7 @@ function App() {
       name: n, 
       email: ic, 
       avatar: a,
-      isAdmin: ic === 'NEXUS-0001', // 指定 0001 为管理员
+      isAdmin: ic === 'NEXUS-0001', 
       inviteCode: ic
     };
     setUser(u);
@@ -109,9 +109,14 @@ function App() {
   };
 
   const handleSendMessage = useCallback(async () => {
-    const providerKey = selectedModel.provider === 'openai' ? openaiKey : (selectedModel.provider === 'anthropic' ? anthropicKey : (googleKey || process.env.API_KEY));
-    if (!inputValue.trim() || isLoading || !user || !providerKey) return;
-    
+    if (!inputValue.trim() || isLoading || !user) return;
+
+    // Determine the relevant API Key
+    let providerKey = "";
+    if (selectedModel.provider === 'openai') providerKey = openaiKey;
+    else if (selectedModel.provider === 'anthropic') providerKey = anthropicKey;
+    else if (selectedModel.provider === 'google') providerKey = googleKey || (process.env.API_KEY as string);
+
     let targetId = currentSessionId;
     let target = sessions.find(s => s.id === targetId);
     let updated = [...sessions];
@@ -125,11 +130,27 @@ function App() {
 
     const text = inputValue.trim();
     setInputValue("");
+    
+    // Add User Message
     target.messages.push({ id: uuidv4(), role: Role.USER, text, timestamp: Date.now() });
     target.updatedAt = Date.now();
     updated = [target, ...updated.filter(s => s.id !== targetId)];
     setSessions(updated);
     localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(updated));
+
+    // KEY VALIDATION CHECK
+    if (!providerKey) {
+      target.messages.push({ 
+        id: uuidv4(), 
+        role: Role.MODEL, 
+        text: `No API Key found for ${selectedModel.provider.toUpperCase()}. Please add it in Settings.`, 
+        isError: true, 
+        timestamp: Date.now() 
+      });
+      setSessions([...updated]);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -174,7 +195,6 @@ function App() {
   return (
     <div className="flex h-screen mothership-bg text-slate-300 font-sans overflow-hidden">
       
-      {/* 标准侧边栏 w-64 */}
       <Sidebar 
         isOpen={true} sessions={sessions} currentSessionId={currentSessionId} 
         onNewChat={() => setCurrentSessionId(null)}
@@ -188,7 +208,6 @@ function App() {
       />
 
       <div className={`flex-1 flex flex-col relative transition-all duration-300 ${labOpen ? 'mr-72' : 'mr-0'}`}>
-        {/* 标准高度页眉 */}
         <header className="h-14 flex items-center justify-between px-6 z-20 border-b border-white/5 bg-nexus-900/40 backdrop-blur-md">
           <div className="flex items-center gap-4">
              <div className="flex items-center gap-2">
@@ -207,7 +226,6 @@ function App() {
           </div>
         </header>
 
-        {/* 聊天消息流 */}
         <div className="flex-1 overflow-y-auto px-6 py-6 md:px-12 custom-scrollbar">
           <div className="max-w-2xl mx-auto min-h-full flex flex-col">
             {currentMessages.length === 0 ? (
@@ -230,7 +248,6 @@ function App() {
           </div>
         </div>
 
-        {/* 输入框 - 布局放宽 */}
         <div className="px-6 py-6 absolute bottom-0 left-0 right-0 pointer-events-none">
           <div className="max-w-2xl mx-auto glass-panel p-2 rounded-[2rem] pointer-events-auto border-white/5 shadow-2xl ring-1 ring-white/5 backdrop-blur-3xl">
             <div className="flex items-end gap-3 px-2 py-1">
@@ -255,7 +272,6 @@ function App() {
         </div>
       </div>
 
-      {/* 右侧工作区 w-72 */}
       <aside className={`fixed inset-y-0 right-0 z-40 w-72 glass-panel border-l transform transition-all duration-500 ease-in-out ${labOpen ? 'translate-x-0' : 'translate-x-full'} bg-nexus-950/80 backdrop-blur-3xl shadow-2xl flex flex-col`}>
         <div className="p-5 border-b border-white/5 flex items-center justify-between">
           <div className="text-[10px] font-black tracking-widest text-white uppercase flex items-center gap-2">
@@ -265,7 +281,6 @@ function App() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
-           {/* 记忆碎片 */}
            <section>
               <h3 className="text-[10px] font-black text-gray-500 uppercase mb-3 flex items-center gap-2 tracking-widest"><MemoryIcon /> Neural Memory</h3>
               <div className="space-y-3">
@@ -288,7 +303,6 @@ function App() {
 
            <div className="h-px bg-white/5"></div>
 
-           {/* 收藏 */}
            <section>
               <h3 className="text-[10px] font-black text-gray-500 uppercase mb-3 flex items-center gap-2 tracking-widest"><PinIcon /> Pinned Snippets</h3>
               <div className="space-y-3">
