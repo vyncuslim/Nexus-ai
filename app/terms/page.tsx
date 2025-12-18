@@ -1,3 +1,4 @@
+
 export default function Terms() {
   return (
     <main style={{ padding: 24 }}>
