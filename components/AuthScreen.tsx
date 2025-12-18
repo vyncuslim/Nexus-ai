@@ -23,7 +23,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
   const [googleKey, setGoogleKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
   
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<React.ReactNode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGsiReady, setIsGsiReady] = useState(false);
   
@@ -89,12 +89,22 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
         error_callback: (err: any) => {
             console.error("OAuth Request Error:", err);
             setIsLoading(false);
+            
             if (err.type === 'popup_closed') {
-                setError("Sign-In window was closed. Please try again and ensure popups are allowed for " + window.location.origin);
+                setError(
+                  <div className="text-left space-y-2">
+                    <p className="font-bold text-red-400">Sign-In window closed immediately.</p>
+                    <p>This is usually caused by an unauthorized origin. In your <a href="https://console.cloud.google.com/" target="_blank" className="underline text-emerald-400">Google Cloud Console</a>, ensure this origin is added to your OAuth Client ID:</p>
+                    <div className="bg-black/50 p-2 rounded font-mono text-[10px] break-all border border-nexus-700">
+                      {window.location.origin}
+                    </div>
+                    <button onClick={() => setShowIdConfig(true)} className="text-[10px] text-gray-400 hover:text-white underline">Click here to check/change Client ID</button>
+                  </div>
+                );
             } else if (err.type === 'popup_blocked_by_browser') {
                 setError("Popup blocked by browser. Please allow popups for this site.");
             } else {
-                setError(`Authorization failed. Check if ${window.location.origin} is authorized in Google Console for this Client ID.`);
+                setError(`Authorization failed: ${err.message || err.type || 'Unknown Error'}`);
             }
         }
       });
