@@ -18,6 +18,7 @@ function App() {
   const [googleKey, setGoogleKey] = useState<string>('');
   const [anthropicKey, setAnthropicKey] = useState<string>('');
   
+  // Set English as default language
   const [language, setLanguage] = useState<Language>('en');
   const [labOpen, setLabOpen] = useState(false);
   const [pinnedItems, setPinnedItems] = useState<ChatMessage[]>([]);
@@ -42,7 +43,7 @@ function App() {
 
   const t = UI_TEXT[language];
 
-  // 加载本地存储
+  // Initialize from LocalStorage
   useEffect(() => {
     const storedUser = localStorage.getItem('nexus_user_v2');
     const storedOpenAI = localStorage.getItem('nexus_openai_key');
@@ -56,7 +57,9 @@ function App() {
     if (storedUser) { 
       try { 
         setUser(JSON.parse(storedUser)); 
-      } catch (e) {} 
+      } catch (e) {
+        console.error("User restoration failed", e);
+      } 
     }
     
     const storedPinned = localStorage.getItem('nexus_pinned');
@@ -66,7 +69,7 @@ function App() {
     if (storedMemories) { try { setGlobalMemories(JSON.parse(storedMemories)); } catch(e) {} }
   }, []);
 
-  // 会话持久化
+  // Sync sessions with User context
   useEffect(() => {
     if (user) {
       const stored = localStorage.getItem(`nexus_sessions_global_${user.id}`);
@@ -111,7 +114,7 @@ function App() {
   const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim() || isLoading || !user) return;
 
-    // Determine the relevant API Key
+    // Detect Active Provider Key
     let providerKey = "";
     if (selectedModel.provider === 'openai') providerKey = openaiKey;
     else if (selectedModel.provider === 'anthropic') providerKey = anthropicKey;
@@ -131,19 +134,19 @@ function App() {
     const text = inputValue.trim();
     setInputValue("");
     
-    // Add User Message
+    // Push User Query
     target.messages.push({ id: uuidv4(), role: Role.USER, text, timestamp: Date.now() });
     target.updatedAt = Date.now();
     updated = [target, ...updated.filter(s => s.id !== targetId)];
     setSessions(updated);
     localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(updated));
 
-    // KEY VALIDATION CHECK
-    if (!providerKey) {
+    // KEY CHECK: If no key, show dedicated error bubble
+    if (!providerKey || providerKey.trim() === "") {
       target.messages.push({ 
         id: uuidv4(), 
         role: Role.MODEL, 
-        text: `No API Key found for ${selectedModel.provider.toUpperCase()}. Please add it in Settings.`, 
+        text: `Error: No API key provided for ${selectedModel.provider.toUpperCase()}. Please link your credentials in the Settings menu to enable the Mothership uplink.`, 
         isError: true, 
         timestamp: Date.now() 
       });
@@ -180,10 +183,13 @@ function App() {
       );
       
       const final = target.messages.find(m => m.id === mid);
-      if (final) { final.text = res.text; final.groundingMetadata = res.groundingMetadata; }
+      if (final) { 
+        final.text = res.text; 
+        final.groundingMetadata = res.groundingMetadata; 
+      }
       localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(updated));
-    } catch (e) {
-      target.messages.push({ id: uuidv4(), role: Role.MODEL, text: `Error: ${e.message}`, isError: true, timestamp: Date.now() });
+    } catch (e: any) {
+      target.messages.push({ id: uuidv4(), role: Role.MODEL, text: `Operational Error: ${e.message}`, isError: true, timestamp: Date.now() });
       setSessions([...updated]);
     } finally { setIsLoading(false); }
   }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, googleKey, anthropicKey, language, currentPersonaId, globalMemories]);
@@ -211,15 +217,15 @@ function App() {
         <header className="h-14 flex items-center justify-between px-6 z-20 border-b border-white/5 bg-nexus-900/40 backdrop-blur-md">
           <div className="flex items-center gap-4">
              <div className="flex items-center gap-2">
-               <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.8)] animate-pulse"></div>
-               <span className="text-xs font-black font-mono text-cyan-500 uppercase tracking-widest">System_Live</span>
+               <div className="w-2 h-2 rounded-full bg-nexus-accent shadow-[0_0_8px_rgba(6,182,212,0.8)] animate-pulse"></div>
+               <span className="text-xs font-black font-mono text-nexus-accent uppercase tracking-widest">Nexus_Uplink</span>
              </div>
           </div>
 
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setLabOpen(!labOpen)} 
-              className={`p-2 rounded-xl glass-panel transition-all ${labOpen ? 'text-cyan-400 border-cyan-500/20 shadow-glow' : 'text-gray-500 hover:text-white'}`}
+              className={`p-2 rounded-xl glass-panel transition-all ${labOpen ? 'text-nexus-accent border-nexus-accent/20 shadow-glow' : 'text-gray-500 hover:text-white'}`}
             >
               <LabIcon />
             </button>
@@ -230,9 +236,11 @@ function App() {
           <div className="max-w-2xl mx-auto min-h-full flex flex-col">
             {currentMessages.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center py-20 opacity-30 select-none">
-                <div className="w-16 h-16 glass-panel rounded-3xl flex items-center justify-center mb-6 shadow-2xl"><BrainIcon /></div>
+                <div className="w-16 h-16 glass-panel rounded-3xl flex items-center justify-center mb-6 shadow-2xl transition-transform hover:scale-105 duration-500">
+                  <BrainIcon />
+                </div>
                 <h1 className="text-2xl font-black italic text-white uppercase tracking-tighter">Nexus Mothership</h1>
-                <p className="text-[10px] text-gray-600 font-mono tracking-[0.5em] mt-2 uppercase">Neural_Link_Established</p>
+                <p className="text-[10px] text-gray-600 font-mono tracking-[0.5em] mt-2 uppercase">Core_System_Online</p>
               </div>
             ) : (
               <div className="space-y-6 pb-24">
@@ -263,7 +271,7 @@ function App() {
                <button 
                  onClick={handleSendMessage} 
                  disabled={isLoading || !inputValue.trim()} 
-                 className={`p-3.5 rounded-2xl transition-all shadow-xl active:scale-90 ${inputValue.trim() && !isLoading ? 'bg-cyan-500 text-black' : 'bg-white/5 text-gray-700 opacity-20'}`}
+                 className={`p-3.5 rounded-2xl transition-all shadow-xl active:scale-90 ${inputValue.trim() && !isLoading ? 'bg-nexus-accent text-black font-black' : 'bg-white/5 text-gray-700 opacity-20'}`}
                >
                  {isLoading ? <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin"></div> : <SendIcon />}
                </button>
@@ -287,12 +295,12 @@ function App() {
                  <input 
                   type="text" 
                   placeholder="Fact to record..."
-                  className="w-full bg-white/5 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500/30 transition-all shadow-inner"
+                  className="w-full bg-white/5 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-nexus-accent/30 transition-all shadow-inner placeholder-gray-800"
                   onKeyDown={(e) => { if (e.key === 'Enter') { addMemory((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; } }}
                  />
                  <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
                    {globalMemories.map(mem => (
-                     <div key={mem.id} className="p-3 prism-card rounded-xl flex items-center justify-between group/mem animate-in fade-in slide-in-from-right-2">
+                     <div key={mem.id} className="p-3 prism-card rounded-xl flex items-center justify-between group/mem animate-in fade-in slide-in-from-right-2 border-white/5">
                         <p className="text-xs text-gray-400 leading-normal flex-1">{mem.content}</p>
                         <button onClick={() => setGlobalMemories(p => p.filter(m => m.id !== mem.id))} className="opacity-0 group-hover/mem:opacity-100 text-red-500/50 hover:text-red-500 ml-2 transition-all">✕</button>
                      </div>
@@ -307,11 +315,11 @@ function App() {
               <h3 className="text-[10px] font-black text-gray-500 uppercase mb-3 flex items-center gap-2 tracking-widest"><PinIcon /> Pinned Snippets</h3>
               <div className="space-y-3">
                 {pinnedItems.length === 0 ? (
-                  <div className="text-center py-8 border border-dashed border-white/5 rounded-2xl text-[10px] text-gray-700 italic">No pinned items</div>
+                  <div className="text-center py-8 border border-dashed border-white/5 rounded-2xl text-[10px] text-gray-700 italic">Vault is empty</div>
                 ) : pinnedItems.map((item) => (
                   <div key={item.id} className="p-3 prism-card rounded-xl relative group overflow-hidden border-white/5">
                       <button onClick={() => setPinnedItems(p => p.filter(i => i.id !== item.id))} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all">✕</button>
-                      <div className="text-[11px] text-gray-500 line-clamp-4 leading-relaxed">{item.text}</div>
+                      <div className="text-[11px] text-gray-500 line-clamp-4 leading-relaxed font-mono">{item.text}</div>
                   </div>
                 ))}
               </div>

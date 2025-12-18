@@ -111,40 +111,47 @@ export const validateInviteCode = (code: string): boolean => {
   return num >= 1 && num <= 1000;
 };
 
-export const SYSTEM_INSTRUCTION_EN = `You are Nexus, a helpful AI assistant. Use Markdown for formatting code. If users ask about code repositories, use real-time search to verify details on GitHub.`;
+// Technical system prompt with GitHub focus
+export const SYSTEM_INSTRUCTION_EN = `You are Nexus, a world-class AI assistant connected to the Mothership hub. 
+When asked about software repositories, coding libraries, or technical projects, prioritize fetching real-time data from GitHub via search grounding. 
+Display repository metadata (stars, forks, description) where available. 
+Maintain a technical, professional, and highly efficient tone. Use Markdown for all technical output.`;
 
-export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus，一个有用的人工智能助手。请使用 Markdown 格式化代码。如果用户询问代码仓库，请使用实时搜索来验证 GitHub 上的详细信息。`;
+export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus，母舰中心的人工智能助手。
+在询问软件、库或代码时，始终通过搜索基础功能利用实时 GitHub 存储库数据。
+使用其特定元数据格式化代码存储库。
+精确、高效、专业。所有格式请使用 Markdown。`;
 
 export const UI_TEXT = {
   en: {
     newChat: "New Chat",
     history: "HISTORY",
-    placeholder: "Type a message...",
+    placeholder: "Transmit signal to Mothership...",
     settings: "Settings",
     language: "Language",
     logout: "Log Out",
-    searchPlaceholder: "Search chats...",
+    searchPlaceholder: "Search neural logs...",
     accessManagement: "Access Control",
     currentCode: "My Invite Code",
-    manageCodes: "Management",
+    manageCodes: "Protocol Management",
     generateNew: "Generate New Code",
     revoke: "Revoke",
-    owner: "Mothership Owner",
-    active: "Active",
-    revoked: "Revoked",
+    owner: "Protocol Owner",
+    active: "Authenticated",
+    revoked: "Terminated",
     persona: "AI Persona",
-    apiKeys: "Neural Connectors",
-    wipeData: "Wipe Local Data",
+    apiKeys: "Neural Connectors (API)",
+    wipeData: "Wipe Local Core",
     invitePlaceholder: "NEXUS-XXXX",
-    namePlaceholder: "Your Name",
-    connectBtn: "Initialize Nexus",
+    namePlaceholder: "Identity Name",
+    connectBtn: "Link Nexus",
     nextBtn: "Next",
-    authErrorInvalidCode: "Unauthorized Access Token.",
+    authErrorInvalidCode: "Access Denied: Invalid Authorization Token.",
     welcomeTitle: "Nexus Core",
-    welcomeSubtitle: "Mothership Interface",
+    welcomeSubtitle: "Mothership Protocol",
     optional: "(Optional)",
-    openaiKeyPlaceholder: "OpenAI Key (sk-...)",
-    googleKeyPlaceholder: "Gemini API Key"
+    openaiKeyPlaceholder: "OpenAI Connector (sk-...)",
+    googleKeyPlaceholder: "Gemini Neural Key"
   },
   zh: {
     newChat: "新建会话",

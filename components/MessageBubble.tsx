@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, Role, AIProvider } from '../types';
 import { RobotIcon, UserIcon, CopyIcon, CheckIcon, SpeakerIcon, StopIcon, XIcon, GlobeIcon, LinkIcon, GitHubIcon } from './Icon';
@@ -27,18 +28,19 @@ const CodeBlock: React.FC<{ content: string }> = ({ content }) => {
   };
 
   return (
-    <div className="relative group my-3">
-      <div className="absolute right-2 top-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+    <div className="relative group my-4">
+      <div className="absolute right-3 top-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <button
           onClick={handleCopy}
-          className="p-1.5 bg-nexus-800 text-gray-400 hover:text-emerald-400 hover:bg-nexus-700 rounded-lg border border-nexus-700 shadow-lg backdrop-blur-sm transition-all"
-          title="Copy code"
+          className="p-2 bg-nexus-900 text-gray-400 hover:text-nexus-accent hover:bg-black rounded-xl border border-white/10 shadow-xl backdrop-blur-md transition-all active:scale-95"
+          title="Copy to clipboard"
         >
           {copied ? <CheckIcon /> : <CopyIcon />}
         </button>
       </div>
-      <pre className="block bg-nexus-950/50 p-4 rounded-xl text-xs sm:text-sm font-mono overflow-x-auto border border-nexus-700/50 shadow-inner custom-scrollbar">
-        <code>{content}</code>
+      <div className="absolute left-4 top-3 text-[10px] font-mono text-gray-600 select-none uppercase tracking-widest opacity-40">Code_Fragment</div>
+      <pre className="block bg-black/60 pt-9 pb-4 px-5 rounded-[1.25rem] text-xs sm:text-sm font-mono overflow-x-auto border border-white/5 shadow-inner custom-scrollbar">
+        <code className="text-gray-200">{content}</code>
       </pre>
     </div>
   );
@@ -52,7 +54,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
   const [ttsError, setTtsError] = useState(false);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-  // Stop audio if component unmounts
   useEffect(() => {
     return () => {
       if (audioSourceRef.current) {
@@ -62,9 +63,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
   }, []);
 
   const toggleSpeech = async () => {
-    // Reset error state on new attempt
     setTtsError(false);
-
     if (isSpeaking) {
       if (audioSourceRef.current) {
         try { audioSourceRef.current.stop(); } catch(e) {}
@@ -73,84 +72,54 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
       setIsSpeaking(false);
       return;
     }
-
-    if (!apiContext?.apiKey) {
-      alert("Please login with an API Key to use TTS.");
-      return;
-    }
+    if (!apiContext?.apiKey) return;
 
     setIsLoadingAudio(true);
     try {
-      // 1. Generate Audio
       const base64Audio = await generateSpeech(message.text, apiContext.apiKey, apiContext.provider);
-      
-      // 2. Play Audio
       const source = await playAudioContent(base64Audio);
       audioSourceRef.current = source;
       setIsSpeaking(true);
-      
       source.onended = () => {
         setIsSpeaking(false);
         audioSourceRef.current = null;
       };
-
     } catch (err) {
-      console.error("TTS Error", err);
+      console.error("Neural Synthesis Failure", err);
       setTtsError(true);
-      // clear error visual after 3 seconds
       setTimeout(() => setTtsError(false), 3000);
     } finally {
       setIsLoadingAudio(false);
     }
   };
 
-  // Basic formatting for code blocks, bold text, and links
   const formatText = (text: string) => {
-    // Regex matches:
-    // 1. Code blocks: ```...```
-    // 2. Links: [text](url)
-    // 3. Raw URLs: http...
-    // 4. Bold: **text**
-    // 5. Inline code: `text`
     const parts = text.split(/(```[\s\S]*?```|\[.*?\]\(.*?\)|https?:\/\/[^\s]+|\*\*.*?\*\*|`.*?`)/g);
-    
     return (
-        <span className="whitespace-pre-wrap leading-relaxed break-words">
+        <span className="whitespace-pre-wrap leading-relaxed break-words font-medium">
             {parts.map((part, i) => {
                 if (!part) return null;
-
-                // Code Block
                 if (part.startsWith('```') && part.endsWith('```')) {
                     let content = part.slice(3, -3);
-                    // Attempt to strip language identifier (e.g. "javascript\n")
-                    content = content.replace(/^[a-zA-Z0-9+#]+\n/, ''); 
+                    content = content.replace(/^[a-zA-Z0-9+#-]+\n/, ''); 
                     return <CodeBlock key={i} content={content.trim()} />;
                 }
-                
-                // Link: [text](url)
                 if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
                     const match = part.match(/\[(.*?)\]\((.*?)\)/);
                     if (match) {
-                        return <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-nexus-accent hover:underline">{match[1]}</a>;
+                        return <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-nexus-accent underline-offset-4 decoration-nexus-accent/30 hover:underline">{match[1]}</a>;
                     }
                 }
-
-                // Raw URL
                 if (part.match(/^https?:\/\//)) {
-                    return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-nexus-accent hover:underline">{part}</a>;
+                    return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-nexus-accent hover:underline truncate inline-block max-w-full align-bottom">{part}</a>;
                 }
-
-                // Bold
                 if (part.startsWith('**') && part.endsWith('**')) {
-                    return <strong key={i}>{part.slice(2, -2)}</strong>;
+                    return <strong key={i} className="text-white font-black">{part.slice(2, -2)}</strong>;
                 }
-
-                // Inline Code
                 if (part.startsWith('`') && part.endsWith('`')) {
-                    return <code key={i} className="bg-nexus-900/50 px-1.5 py-0.5 rounded text-xs font-mono text-nexus-accent/80 border border-nexus-700/30">{part.slice(1, -1)}</code>;
+                    return <code key={i} className="bg-white/5 px-2 py-0.5 rounded-lg text-xs font-mono text-nexus-accent border border-white/5">{part.slice(1, -1)}</code>;
                 }
-
-                return <span key={i}>{part}</span>;
+                return <span key={i} className="text-gray-300/90">{part}</span>;
             })}
         </span>
     );
@@ -159,113 +128,69 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
   const hasSources = message.groundingMetadata?.groundingChunks && message.groundingMetadata.groundingChunks.length > 0;
 
   return (
-    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-6 group`}>
-      <div className={`flex max-w-[90%] md:max-w-[80%] gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-8 animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+      <div className={`flex max-w-[90%] md:max-w-[85%] gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
         
-        {/* Avatar */}
         <div className={`
-          flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center overflow-hidden
-          ${isUser ? 'bg-nexus-accent' : isError ? 'bg-red-600' : 'bg-emerald-600'}
-          shadow-lg
+          flex-shrink-0 w-9 h-9 rounded-2xl flex items-center justify-center overflow-hidden border
+          ${isUser ? 'bg-nexus-accent border-white/10 shadow-lg shadow-nexus-accent/20' : isError ? 'bg-red-500/20 border-red-500/30' : 'bg-white/5 border-white/10'}
+          transition-transform hover:scale-110
         `}>
-          {isUser ? <UserIcon /> : <RobotIcon />}
+          {isUser ? <div className="text-black"><UserIcon /></div> : <div className="text-white"><RobotIcon /></div>}
         </div>
 
-        {/* Bubble */}
         <div className={`
-          relative px-4 py-3 rounded-2xl shadow-sm border group flex flex-col min-w-0
+          relative px-6 py-4 rounded-[1.75rem] shadow-2xl border transition-all duration-300
           ${isUser 
-            ? 'bg-slate-500 text-white rounded-tr-sm border-transparent' 
+            ? 'bg-nexus-accent text-gray-950 rounded-tr-sm border-transparent' 
             : isError 
-              ? 'bg-red-900/20 text-red-200 border-red-500/50 rounded-tl-sm' 
-              : 'bg-nexus-800 text-gray-100 rounded-tl-sm border-nexus-700'}
+              ? 'bg-red-950/40 text-red-200 border-red-500/40 rounded-tl-sm backdrop-blur-md' 
+              : 'bg-nexus-900/60 text-gray-100 rounded-tl-sm border-white/5 backdrop-blur-2xl'}
         `}>
-          {/* Label Header */}
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-xs font-semibold opacity-50">{isUser ? 'You' : 'Nexus'}</span>
-            
-            <div className="flex items-center gap-2">
-               {isError && <span className="text-red-400 text-xs ml-2">ERROR</span>}
-               
-               {/* TTS Button (Only for Model) */}
-               {!isUser && !isError && message.text && (
-                 <button 
-                   onClick={toggleSpeech}
-                   disabled={isLoadingAudio}
-                   className={`
-                     p-1 rounded-md transition-all duration-200 flex items-center justify-center
-                     ${ttsError 
-                        ? 'text-red-400 bg-red-900/20' 
-                        : isSpeaking 
-                            ? 'text-nexus-accent bg-nexus-900/50 ring-1 ring-nexus-accent/30 shadow-[0_0_10px_rgba(59,130,246,0.3)]' 
-                            : 'text-gray-500 hover:text-white hover:bg-nexus-700'}
-                   `}
-                   title={ttsError ? "TTS Failed" : isSpeaking ? "Stop" : "Read Aloud"}
-                   aria-label={isSpeaking ? "Stop reading" : "Read aloud"}
-                 >
-                   {isLoadingAudio ? (
-                     <span className="block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                   ) : ttsError ? (
-                     <XIcon /> 
-                   ) : isSpeaking ? (
-                     <StopIcon />
-                   ) : (
-                     <SpeakerIcon />
-                   )}
-                 </button>
-               )}
-            </div>
+          <div className="flex justify-between items-center mb-2">
+            <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isUser ? 'text-black/60' : 'text-gray-500'}`}>{isUser ? 'Uplink' : 'Nexus_Response'}</span>
+            {!isUser && !isError && message.text && (
+               <button 
+                 onClick={toggleSpeech}
+                 disabled={isLoadingAudio}
+                 className={`p-1.5 rounded-xl transition-all ${isSpeaking ? 'bg-nexus-accent/20 text-nexus-accent shadow-glow' : 'text-gray-600 hover:text-white hover:bg-white/5'}`}
+               >
+                 {isLoadingAudio ? <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span> : isSpeaking ? <StopIcon /> : <SpeakerIcon />}
+               </button>
+            )}
           </div>
           
-          <div className="text-sm md:text-base">
+          <div className="text-sm md:text-base selection:bg-nexus-accent/40">
             {formatText(message.text)}
           </div>
 
-          {/* Attachments */}
           {message.attachment && (
-            <div className="mt-3 rounded-lg overflow-hidden border border-nexus-700 shadow-md">
-              {message.attachment.type === 'image' && (
-                <img src={message.attachment.url} alt="Generated content" className="w-full h-auto max-h-96 object-contain bg-black/50" />
-              )}
-              {message.attachment.type === 'video' && (
-                <video controls src={message.attachment.url} className="w-full max-h-96 bg-black/50" />
-              )}
+            <div className="mt-4 rounded-2xl overflow-hidden border border-white/10 shadow-2xl group/attachment">
+              {message.attachment.type === 'image' && <img src={message.attachment.url} alt="Output" className="w-full h-auto max-h-[500px] object-contain bg-black" />}
+              {message.attachment.type === 'video' && <video controls src={message.attachment.url} className="w-full max-h-[500px] bg-black" />}
             </div>
           )}
 
-           {/* Sources (Grounding) */}
            {hasSources && (
-             <div className="mt-4 pt-3 border-t border-nexus-700/50">
-               <div className="flex items-center gap-2 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                 <GlobeIcon />
-                 Sources
+             <div className="mt-6 pt-5 border-t border-white/5">
+               <div className="flex items-center gap-2 mb-3 text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                 <GlobeIcon /> Verified_Knowledge_Sources
                </div>
-               <div className="grid grid-cols-1 gap-2">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                  {message.groundingMetadata?.groundingChunks?.map((chunk, idx) => {
                    if (!chunk.web) return null;
                    const isGitHub = chunk.web.uri.includes('github.com');
-                   
                    return (
                      <a 
-                       key={idx} 
-                       href={chunk.web.uri} 
-                       target="_blank" 
-                       rel="noopener noreferrer"
-                       className="flex items-center gap-3 p-2 rounded-lg bg-nexus-900/50 hover:bg-nexus-700 border border-nexus-700/50 hover:border-nexus-600 transition-all group/link"
+                       key={idx} href={chunk.web.uri} target="_blank" rel="noopener noreferrer"
+                       className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-nexus-accent/30 transition-all group/link"
                      >
-                       <div className={`p-1.5 rounded-full ${isGitHub ? 'bg-black text-white' : 'bg-nexus-800 text-nexus-accent/70'} group-hover/link:scale-110 transition-transform`}>
+                       <div className={`p-2 rounded-xl ${isGitHub ? 'bg-black text-white' : 'bg-nexus-accent/10 text-nexus-accent'} group-hover/link:scale-105 transition-transform border border-white/5`}>
                          {isGitHub ? <GitHubIcon /> : <LinkIcon />}
                        </div>
                        <div className="flex-1 min-w-0">
-                         <div className="flex items-center gap-2">
-                           <div className="text-xs font-medium text-gray-300 truncate group-hover/link:text-white">
-                             {chunk.web.title}
-                           </div>
-                           {isGitHub && <span className="text-[9px] bg-white/10 text-white/60 px-1 rounded font-mono">REPO</span>}
-                         </div>
-                         <div className="text-[10px] text-gray-500 truncate font-mono">
-                           {new URL(chunk.web.uri).hostname}
-                         </div>
+                         <div className="text-xs font-bold text-gray-300 truncate group-hover/link:text-white">{chunk.web.title}</div>
+                         <div className="text-[9px] text-gray-600 truncate font-mono tracking-tighter mt-0.5">{new URL(chunk.web.uri).hostname}</div>
                        </div>
                      </a>
                    );
@@ -273,11 +198,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
                </div>
              </div>
            )}
-
-          {/* Timestamp (Hidden by default, shown on hover) */}
-          <div className="absolute -bottom-5 left-0 w-full text-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-gray-500">
-            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </div>
         </div>
       </div>
     </div>
