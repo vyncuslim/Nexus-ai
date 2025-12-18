@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   PlusIcon, GlobeIcon, LogOutIcon, TrashIcon, 
@@ -72,65 +73,68 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      <aside className="w-64 glass-panel border-r flex flex-col h-screen flex-shrink-0 z-30 shadow-2xl bg-nexus-950/90">
-        <div className="flex flex-col h-full backdrop-blur-3xl">
+      <aside className="w-64 glass-panel border-r flex flex-col h-screen flex-shrink-0 z-30 shadow-2xl bg-nexus-950/90 relative overflow-hidden">
+        {/* Animated accent in sidebar */}
+        <div className="absolute -top-20 -left-20 w-40 h-40 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div className="flex flex-col h-full backdrop-blur-3xl relative z-10">
           <div className="p-4 border-b border-white/5">
             <div className="flex items-center gap-3 mb-4 group cursor-default">
-              <div className="w-8 h-8 glass-panel rounded-xl flex items-center justify-center bg-gradient-to-tr from-cyan-500/20 to-purple-500/20 shadow-lg border-cyan-500/10">
+              <div className="w-8 h-8 glass-panel rounded-xl flex items-center justify-center bg-gradient-to-tr from-cyan-500/20 to-purple-500/20 shadow-lg border-cyan-500/10 group-hover:scale-105 transition-transform duration-300">
                 <BrainIcon />
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-black italic tracking-tighter text-white uppercase">NEXUS_OS</span>
+                <span className="text-sm font-black italic tracking-tighter text-white uppercase group-hover:tracking-tight transition-all">NEXUS_OS</span>
                 <span className="text-[10px] text-cyan-500 font-mono tracking-widest leading-none">V2.1 PRO</span>
               </div>
             </div>
 
-            <button onClick={onNewChat} className="w-full flex items-center justify-center gap-2 p-2.5 glass-panel rounded-xl hover:bg-white/5 transition-all text-sm font-bold text-white mb-3 border-white/10">
-              <PlusIcon /> {t.newChat}
+            <button onClick={onNewChat} className="w-full flex items-center justify-center gap-2 p-2.5 glass-panel rounded-xl hover:bg-white/5 transition-all text-sm font-bold text-white mb-3 border-white/10 group">
+              <PlusIcon /> <span className="group-hover:translate-x-0.5 transition-transform">{t.newChat}</span>
             </button>
 
             <div className="relative">
-              <div className="absolute left-3 top-2.5 text-gray-500"><SearchIcon /></div>
+              <div className="absolute left-3 top-2.5 text-gray-600"><SearchIcon /></div>
               <input 
                 type="text" 
                 placeholder={t.searchPlaceholder} 
                 value={searchQuery} 
                 onChange={(e) => setSearchQuery(e.target.value)} 
-                className="w-full bg-white/5 border border-white/5 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-cyan-500/30"
+                className="w-full bg-white/5 border border-white/5 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-cyan-500/30 transition-all"
               />
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-            <div className="px-3 py-1 text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] opacity-50">Memory Logs</div>
+            <div className="px-3 py-2 text-[9px] font-black text-gray-700 uppercase tracking-[0.3em]">Memory_Logs</div>
             {sessions.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase())).map(session => (
               <div 
                 key={session.id} onClick={() => onSelectSession(session.id)}
-                className={`group relative flex items-center px-4 py-2.5 rounded-xl cursor-pointer transition-all border ${currentSessionId === session.id ? 'bg-cyan-500/10 border-cyan-500/20 text-white' : 'text-gray-400 hover:bg-white/5 border-transparent hover:text-gray-200'}`}
+                className={`group relative flex items-center px-4 py-2.5 rounded-xl cursor-pointer transition-all border ${currentSessionId === session.id ? 'bg-cyan-500/10 border-cyan-500/20 text-white shadow-glow' : 'text-gray-500 hover:bg-white/5 border-transparent hover:text-gray-300'}`}
               >
                 <span className="truncate text-sm flex-1 font-medium">{session.title || 'Mothership Log...'}</span>
-                <button onClick={(e) => onDeleteSession(session.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400">✕</button>
+                <button onClick={(e) => onDeleteSession(session.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all">✕</button>
               </div>
             ))}
           </div>
 
           <div className="p-4 bg-black/20 border-t border-white/5 space-y-3">
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setShowSettingsModal(true)} className="flex items-center justify-center gap-2 p-2 glass-panel rounded-xl text-xs font-bold text-gray-400 hover:text-white transition-all"><SettingsIcon /> {t.settings}</button>
-              <button onClick={onToggleLanguage} className="flex items-center justify-center gap-2 p-2 glass-panel rounded-xl text-xs font-bold text-gray-400 hover:text-white uppercase transition-all"><GlobeIcon /> {language}</button>
+              <button onClick={() => setShowSettingsModal(true)} className="flex items-center justify-center gap-2 p-2 glass-panel rounded-xl text-xs font-bold text-gray-500 hover:text-white transition-all"><SettingsIcon /> {t.settings}</button>
+              <button onClick={onToggleLanguage} className="flex items-center justify-center gap-2 p-2 glass-panel rounded-xl text-xs font-bold text-gray-500 hover:text-white uppercase transition-all"><GlobeIcon /> {language}</button>
             </div>
             
-            <div className="flex items-center justify-between p-2.5 glass-panel rounded-xl hover:bg-white/5 transition-all cursor-pointer group">
+            <div className="flex items-center justify-between p-2.5 glass-panel rounded-xl hover:bg-white/5 transition-all cursor-pointer group shadow-glow">
                <div className="flex items-center gap-3 min-w-0">
                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-white/10 text-xs font-black shadow-inner">
                    {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover rounded-xl" /> : user.name[0].toUpperCase()}
                  </div>
                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-bold text-white truncate">{user.name}</span>
-                    <span className="text-[10px] text-gray-500 font-mono tracking-tighter uppercase">{user.isAdmin ? 'OWNER' : 'USER'}</span>
+                    <span className="text-sm font-bold text-white truncate group-hover:text-cyan-400 transition-colors">{user.name}</span>
+                    <span className="text-[10px] text-gray-600 font-mono tracking-tighter uppercase">{user.isAdmin ? 'OWNER_LVL_1' : 'OPERATOR_LVL_0'}</span>
                  </div>
                </div>
-               <button onClick={onLogout} className="text-gray-600 hover:text-red-400 p-1"><LogOutIcon /></button>
+               <button onClick={onLogout} className="text-gray-700 hover:text-red-400 p-1 transition-colors"><LogOutIcon /></button>
             </div>
           </div>
         </div>
@@ -139,24 +143,24 @@ const Sidebar: React.FC<SidebarProps> = ({
       {showSettingsModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
            <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={() => setShowSettingsModal(false)}></div>
-           <div className="iphone-modal w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col relative z-[101] max-h-[85vh] border border-white/10">
+           <div className="iphone-modal w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col relative z-[101] max-h-[85vh] border border-white/10 animate-in zoom-in-95 duration-200">
               
               <div className="px-8 py-5 flex items-center justify-between border-b border-white/5 bg-white/2">
                 <button onClick={() => setShowSettingsModal(false)} className="text-cyan-500 text-sm font-bold hover:opacity-70 transition-opacity">Done</button>
-                <h2 className="text-xs font-black text-white uppercase tracking-[0.2em]">Core Configuration</h2>
+                <h2 className="text-xs font-black text-white uppercase tracking-[0.2em]">Neural Configuration</h2>
                 <div className="w-10"></div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-[#050811]">
                  
                  <section>
-                    <div className="px-2 mb-2 text-[10px] text-gray-500 uppercase font-black tracking-widest flex items-center gap-2">
+                    <div className="px-2 mb-2 text-[10px] text-gray-600 uppercase font-black tracking-widest flex items-center gap-2">
                        <ActivityIcon /> {t.accessManagement}
                     </div>
-                    <div className="iphone-group bg-white/[0.03] border border-white/5 p-4 space-y-4">
+                    <div className="iphone-group bg-white/[0.03] border border-white/5 p-4 space-y-4 shadow-inner">
                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-300 font-medium">{t.currentCode}</span>
-                          <span className="text-sm font-mono text-cyan-400 bg-cyan-400/10 px-3 py-1 rounded-lg border border-cyan-400/20">
+                          <span className="text-xs text-gray-400 font-medium">{t.currentCode}</span>
+                          <span className="text-xs font-mono text-cyan-400 bg-cyan-400/10 px-3 py-1 rounded-lg border border-cyan-400/20">
                             {user.inviteCode || 'N/A'}
                           </span>
                        </div>
@@ -164,25 +168,25 @@ const Sidebar: React.FC<SidebarProps> = ({
                        {user.isAdmin && (
                          <div className="pt-4 border-t border-white/5 space-y-3">
                             <div className="flex items-center justify-between mb-2">
-                               <span className="text-xs font-black text-gray-500 uppercase tracking-tighter">{t.manageCodes}</span>
+                               <span className="text-[10px] font-black text-gray-600 uppercase tracking-tighter">{t.manageCodes}</span>
                                <button 
                                  onClick={generateNewCode}
-                                 className="text-[10px] bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white px-3 py-1 rounded-full font-bold transition-all border border-emerald-500/30"
+                                 className="text-[9px] bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white px-3 py-1 rounded-full font-bold transition-all border border-emerald-500/30"
                                >
                                  + {t.generateNew}
                                </button>
                             </div>
                             <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
                                {managedCodes.map((item, idx) => (
-                                 <div key={idx} className="flex items-center justify-between bg-black/40 rounded-xl p-3 border border-white/5 group">
+                                 <div key={idx} className="flex items-center justify-between bg-black/40 rounded-xl p-3 border border-white/5 group hover:border-white/10 transition-all">
                                     <div className="flex flex-col">
-                                       <span className={`text-sm font-mono font-bold ${item.status === 'revoked' ? 'text-gray-600 line-through' : 'text-white'}`}>{item.code}</span>
-                                       <span className={`text-[9px] uppercase font-black ${item.status === 'active' ? 'text-emerald-500' : 'text-red-500'}`}>
+                                       <span className={`text-xs font-mono font-bold ${item.status === 'revoked' ? 'text-gray-700 line-through' : 'text-gray-200'}`}>{item.code}</span>
+                                       <span className={`text-[8px] uppercase font-black ${item.status === 'active' ? 'text-emerald-500' : 'text-red-500'}`}>
                                          {item.status === 'active' ? t.active : t.revoked}
                                        </span>
                                     </div>
                                     {item.status === 'active' && item.code !== 'NEXUS-0001' && (
-                                       <button onClick={() => revokeCode(item.code)} className="opacity-0 group-hover:opacity-100 p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg">
+                                       <button onClick={() => revokeCode(item.code)} className="opacity-0 group-hover:opacity-100 p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg transition-all">
                                          <TrashIcon />
                                        </button>
                                     )}
@@ -195,8 +199,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                  </section>
 
                  <section>
-                    <div className="px-2 mb-2 text-[10px] text-gray-500 uppercase font-black tracking-widest flex items-center gap-2">
-                       <LinkIcon /> {t.apiKeys}
+                    <div className="px-2 mb-2 text-[10px] text-gray-600 uppercase font-black tracking-widest flex items-center gap-2">
+                       <LinkIcon /> Neural_Connectors
                     </div>
                     <div className="iphone-group bg-white/[0.03] border border-white/5">
                       {[
@@ -207,22 +211,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <div key={p.id} className="border-b border-white/5 last:border-none">
                           <div 
                             onClick={() => setEditingProvider(editingProvider === p.id ? null : p.id)}
-                            className="flex items-center gap-4 py-4 px-5 hover:bg-white/[0.05] cursor-pointer"
+                            className="flex items-center gap-4 py-4 px-5 hover:bg-white/[0.05] cursor-pointer transition-all active:bg-white/10"
                           >
                             <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-cyan-400 shadow-inner">{p.icon}</div>
-                            <div className="flex-1 text-sm text-gray-200 font-bold">{p.name}</div>
-                            <div className={`text-[10px] font-black px-2 py-1 rounded-lg border ${p.key ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-gray-500 bg-white/5'}`}>
-                              {p.key ? 'ON' : 'OFF'}
+                            <div className="flex-1 text-xs text-gray-300 font-bold">{p.name}</div>
+                            <div className={`text-[9px] font-black px-2 py-1 rounded-lg border ${p.key ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-gray-700 bg-white/5 border-transparent'}`}>
+                              {p.key ? 'LINKED' : 'OFFLINE'}
                             </div>
-                            <div className={`transition-transform duration-300 text-gray-600 ${editingProvider === p.id ? 'rotate-180' : ''}`}><ChevronDownIcon /></div>
+                            <div className={`transition-transform duration-300 text-gray-700 ${editingProvider === p.id ? 'rotate-180' : ''}`}><ChevronDownIcon /></div>
                           </div>
                           {editingProvider === p.id && (
-                            <div className="px-5 pb-5 pt-0">
+                            <div className="px-5 pb-5 pt-0 animate-in slide-in-from-top-1">
                               <input 
                                 type="password" 
                                 value={p.key} 
                                 onChange={(e) => handleKeyChange(p.id as any, e.target.value)}
-                                className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-mono focus:border-cyan-500/50 outline-none"
+                                className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono focus:border-cyan-500/50 outline-none shadow-inner"
                                 placeholder={`Enter ${p.name} Key...`}
                               />
                             </div>
@@ -233,17 +237,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                  </section>
 
                  <section>
-                    <div className="px-2 mb-2 text-[10px] text-gray-500 uppercase font-black tracking-widest flex items-center gap-2">
-                       <HelpIcon /> Legal & Compliance
+                    <div className="px-2 mb-2 text-[10px] text-gray-600 uppercase font-black tracking-widest flex items-center gap-2">
+                       <HelpIcon /> Protocol_Compliance
                     </div>
                     <div className="iphone-group bg-white/[0.03] border border-white/5 px-5 py-2">
-                       <button onClick={() => setShowLegalView('privacy')} className="w-full text-left py-3 text-sm text-gray-400 hover:text-white border-b border-white/5">Privacy Policy</button>
-                       <button onClick={() => setShowLegalView('terms')} className="w-full text-left py-3 text-sm text-gray-400 hover:text-white">Terms of Service</button>
+                       <button onClick={() => setShowLegalView('privacy')} className="w-full text-left py-3 text-xs text-gray-400 hover:text-white border-b border-white/5 transition-colors">Privacy Policy</button>
+                       <button onClick={() => setShowLegalView('terms')} className="w-full text-left py-3 text-xs text-gray-400 hover:text-white transition-colors">Terms of Service</button>
                     </div>
                  </section>
 
                  <div className="pt-4 pb-8">
-                    <button className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-2xl font-black text-xs uppercase tracking-widest border border-red-500/20" onClick={onLogout}>
+                    <button className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-red-500/20 transition-all active:scale-95" onClick={onLogout}>
                       {t.wipeData}
                     </button>
                  </div>
@@ -253,25 +257,29 @@ const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {showLegalView && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-nexus-950/95 animate-in fade-in zoom-in-95 duration-200">
-           <div className="max-w-2xl w-full h-[80vh] flex flex-col bg-nexus-900 border border-white/10 rounded-[2.5rem] overflow-hidden">
-              <div className="px-8 py-5 border-b border-white/5 flex items-center justify-between">
-                 <h3 className="text-sm font-black text-white uppercase tracking-widest">
-                   {showLegalView === 'privacy' ? 'Privacy Policy' : 'Terms of Service'}
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-nexus-950/95 backdrop-blur-3xl animate-in fade-in zoom-in-95 duration-200">
+           <div className="max-w-2xl w-full h-[80vh] flex flex-col bg-nexus-900 border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl">
+              <div className="px-8 py-5 border-b border-white/5 flex items-center justify-between bg-white/2">
+                 <h3 className="text-xs font-black text-white uppercase tracking-[0.3em]">
+                   {showLegalView === 'privacy' ? 'Privacy Protocol' : 'Operational Terms'}
                  </h3>
-                 <button onClick={() => setShowLegalView(null)} className="p-2 text-gray-400 hover:text-white"><XIcon /></button>
+                 <button onClick={() => setShowLegalView(null)} className="p-2 text-gray-500 hover:text-white transition-colors"><XIcon /></button>
               </div>
               <div className="flex-1 p-8 overflow-y-auto text-sm text-gray-400 leading-relaxed custom-scrollbar prose prose-invert">
                  {showLegalView === 'privacy' ? (
-                   <div className="space-y-4">
-                     <p>NEXUS-AI uses Google Sign-In to authenticate users. We collect basic profile information such as email and profile name solely for account creation and login.</p>
+                   <div className="space-y-6">
+                     <div className="p-4 bg-cyan-500/5 rounded-2xl border border-cyan-500/10">
+                        <p className="font-bold text-cyan-400 mb-2">NEXUS-AI uses Google Sign-In to authenticate users.</p>
+                        <p>We collect basic profile information such as email and profile name solely for account creation and login.</p>
+                     </div>
                      <p>We do not sell or share user data with third parties. Users can request account and data deletion at any time.</p>
-                     <p>Contact: vyncuslim121@gmail.com</p>
+                     <p className="pt-6 border-t border-white/5 text-[10px] font-mono tracking-widest">ENCRYPTED_CONTACT: vyncuslim121@gmail.com</p>
                    </div>
                  ) : (
-                   <div className="space-y-4">
-                     <p>By using NEXUS-AI, you agree to use the service responsibly. The service is provided on an "as is" basis without warranties.</p>
-                     <p>We reserve the right to modify or discontinue the service at any time.</p>
+                   <div className="space-y-6">
+                     <p className="font-bold text-cyan-400">By using NEXUS-AI, you agree to use the service responsibly.</p>
+                     <p>The service is provided on an "as is" basis without warranties of any kind, express or implied.</p>
+                     <p>We reserve the right to modify or discontinue the service at any time to maintain Mothership stability.</p>
                    </div>
                  )}
               </div>
