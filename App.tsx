@@ -18,7 +18,7 @@ function App() {
   const [googleKey, setGoogleKey] = useState<string>('');
   const [anthropicKey, setAnthropicKey] = useState<string>('');
   
-  const [language, setLanguage] = useState<Language>('zh');
+  const [language, setLanguage] = useState<Language>('en');
   const [labOpen, setLabOpen] = useState(false);
   const [pinnedItems, setPinnedItems] = useState<ChatMessage[]>([]);
   const [globalMemories, setGlobalMemories] = useState<GlobalMemory[]>([]);
