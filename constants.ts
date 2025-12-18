@@ -20,18 +20,10 @@ export const GEMINI_MODELS: ModelConfig[] = [
     provider: 'openai',
     isPro: false
   },
-  {
-    id: 'dall-e-3',
-    name: 'DALL·E 3',
-    description: 'Generate high-quality images.',
-    category: 'image',
-    provider: 'openai',
-    isPro: true
-  },
   // Google Gemini Models
   {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
+    id: 'gemini-3-flash-preview',
+    name: 'Gemini 3 Flash',
     description: 'Fast, low latency, versatile.',
     category: 'text',
     provider: 'google',
@@ -45,21 +37,39 @@ export const GEMINI_MODELS: ModelConfig[] = [
     provider: 'google',
     isPro: true
   },
+  // DeepSeek Models
   {
-    id: 'gemini-3-pro-image-preview',
-    name: 'Gemini 3 Image',
-    description: 'Nano Banana Pro generation.',
-    category: 'image',
-    provider: 'google',
+    id: 'deepseek-chat',
+    name: 'DeepSeek V3',
+    description: 'High intelligence, open-weights king.',
+    category: 'text',
+    provider: 'deepseek',
     isPro: true
   },
   {
-    id: 'veo-3.1-fast-generate-preview',
-    name: 'Veo Video',
-    description: 'Generate videos (720p).',
-    category: 'video',
-    provider: 'google',
+    id: 'deepseek-reasoner',
+    name: 'DeepSeek R1',
+    description: 'Chain-of-thought specialist.',
+    category: 'text',
+    provider: 'deepseek',
     isPro: true
+  },
+  // Grok Models
+  {
+    id: 'grok-2-latest',
+    name: 'Grok-2',
+    description: 'xAI flagship model.',
+    category: 'text',
+    provider: 'grok',
+    isPro: true
+  },
+  {
+    id: 'grok-2-mini',
+    name: 'Grok-2 Mini',
+    description: 'Speed-optimized Grok.',
+    category: 'text',
+    provider: 'grok',
+    isPro: false
   },
   // Anthropic Models
   {
@@ -68,15 +78,6 @@ export const GEMINI_MODELS: ModelConfig[] = [
     description: 'Articulate & precise.',
     category: 'text',
     provider: 'anthropic',
-    isPro: true
-  },
-  // CodeX Models
-  {
-    id: 'codex-davinci-002',
-    name: 'CodeX Ultra',
-    description: 'Specialized code generation.',
-    category: 'text',
-    provider: 'codex',
     isPro: true
   }
 ];
@@ -114,12 +115,10 @@ export const validateInviteCode = (code: string): boolean => {
 // Technical system prompt with GitHub focus
 export const SYSTEM_INSTRUCTION_EN = `You are Nexus, a world-class AI assistant connected to the Mothership hub. 
 When asked about software repositories, coding libraries, or technical projects, prioritize fetching real-time data from GitHub via search grounding. 
-Display repository metadata (stars, forks, description) where available. 
 Maintain a technical, professional, and highly efficient tone. Use Markdown for all technical output.`;
 
 export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus，母舰中心的人工智能助手。
 在询问软件、库或代码时，始终通过搜索基础功能利用实时 GitHub 存储库数据。
-使用其特定元数据格式化代码存储库。
 精确、高效、专业。所有格式请使用 Markdown。`;
 
 export const UI_TEXT = {
@@ -150,8 +149,10 @@ export const UI_TEXT = {
     welcomeTitle: "Nexus Core",
     welcomeSubtitle: "Mothership Protocol",
     optional: "(Optional)",
-    openaiKeyPlaceholder: "OpenAI Connector (sk-...)",
-    googleKeyPlaceholder: "Gemini Neural Key"
+    openaiKeyPlaceholder: "OpenAI Key (sk-...)",
+    googleKeyPlaceholder: "Gemini Neural Key",
+    deepseekKeyPlaceholder: "DeepSeek API Key",
+    grokKeyPlaceholder: "Grok (xAI) API Key"
   },
   zh: {
     newChat: "新建会话",
@@ -181,6 +182,8 @@ export const UI_TEXT = {
     welcomeSubtitle: "母舰管理界面",
     optional: "(选填)",
     openaiKeyPlaceholder: "OpenAI 密钥 (sk-...)",
-    googleKeyPlaceholder: "Gemini API 密钥"
+    googleKeyPlaceholder: "Gemini API 密钥",
+    deepseekKeyPlaceholder: "DeepSeek API 密钥",
+    grokKeyPlaceholder: "Grok (xAI) API 密钥"
   }
 };

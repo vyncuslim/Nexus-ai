@@ -40,7 +40,7 @@ export interface ChatMessage {
 }
 
 export type ModelCategory = 'text' | 'image' | 'video';
-export type AIProvider = 'openai' | 'google' | 'anthropic' | 'codex';
+export type AIProvider = 'openai' | 'google' | 'anthropic' | 'codex' | 'deepseek' | 'grok';
 
 export interface ModelConfig {
   id: string;

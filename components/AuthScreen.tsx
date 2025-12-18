@@ -21,7 +21,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
   const [showIdConfig, setShowIdConfig] = useState(false);
   
   const [openaiKey, setOpenaiKey] = useState('');
-  const [googleKey, setGoogleKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
   
   const [error, setError] = useState<React.ReactNode | null>(null);
@@ -119,7 +118,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
     e.preventDefault();
     onAuthSuccess(inviteCode, name, {
       openai: openaiKey.startsWith('sk-') ? openaiKey.trim() : undefined,
-      google: googleKey.length > 5 ? googleKey.trim() : undefined,
       anthropic: anthropicKey.startsWith('sk-ant') ? anthropicKey.trim() : undefined,
       googleClientId: customClientId.trim()
     }, avatar);
@@ -228,9 +226,9 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
              {step === 3 && (
               <form onSubmit={handleFinalSubmit} className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                 <div className="space-y-3">
-                  <div className="relative group">
-                    <div className="absolute left-4 top-4 text-gray-700 group-focus-within:text-cyan-500 transition-colors"><GoogleIcon /></div>
-                    <input type="password" value={googleKey} onChange={(e) => setGoogleKey(e.target.value)} className="w-full bg-black/40 border border-white/10 text-white rounded-2xl pl-12 pr-6 py-4 focus:border-cyan-500/50 outline-none font-mono text-xs placeholder-gray-800" placeholder={t.googleKeyPlaceholder} />
+                  <div className="p-3 bg-cyan-900/20 border border-cyan-500/20 rounded-xl flex items-center gap-3">
+                     <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
+                     <span className="text-sm text-cyan-200">Google Gemini Connected</span>
                   </div>
                   <div className="relative group">
                     <div className="absolute left-4 top-4 text-gray-700 group-focus-within:text-blue-500 transition-colors"><OpenAIIcon /></div>

@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
 import AuthScreen from './components/AuthScreen';
 import { 
-  SendIcon, BroomIcon, BrainIcon, PinIcon, LabIcon, MemoryIcon
+  SendIcon, BrainIcon, PinIcon, LabIcon, MemoryIcon
 } from './components/Icon';
 import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, UI_TEXT, PERSONAS } from './constants';
 import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, GlobalMemory } from './types';
@@ -15,10 +15,10 @@ import { v4 as uuidv4 } from 'uuid';
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [openaiKey, setOpenaiKey] = useState<string>('');
-  const [googleKey, setGoogleKey] = useState<string>('');
   const [anthropicKey, setAnthropicKey] = useState<string>('');
+  const [deepseekKey, setDeepseekKey] = useState<string>('');
+  const [grokKey, setGrokKey] = useState<string>('');
   
-  // Set English as default language
   const [language, setLanguage] = useState<Language>('en');
   const [labOpen, setLabOpen] = useState(false);
   const [pinnedItems, setPinnedItems] = useState<ChatMessage[]>([]);
@@ -47,19 +47,19 @@ function App() {
   useEffect(() => {
     const storedUser = localStorage.getItem('nexus_user_v2');
     const storedOpenAI = localStorage.getItem('nexus_openai_key');
-    const storedGoogle = localStorage.getItem('nexus_google_key');
     const storedAnthropic = localStorage.getItem('nexus_anthropic_key');
+    const storedDeepSeek = localStorage.getItem('nexus_deepseek_key');
+    const storedGrok = localStorage.getItem('nexus_grok_key');
 
     if (storedOpenAI) setOpenaiKey(storedOpenAI);
-    if (storedGoogle) setGoogleKey(storedGoogle);
     if (storedAnthropic) setAnthropicKey(storedAnthropic);
+    if (storedDeepSeek) setDeepseekKey(storedDeepSeek);
+    if (storedGrok) setGrokKey(storedGrok);
     
     if (storedUser) { 
       try { 
         setUser(JSON.parse(storedUser)); 
-      } catch (e) {
-        console.error("User restoration failed", e);
-      } 
+      } catch (e) { console.error(e); } 
     }
     
     const storedPinned = localStorage.getItem('nexus_pinned');
@@ -83,10 +83,11 @@ function App() {
     }
   }, [user]);
 
-  const handleUpdateApiKeys = (keys: { google?: string, openai?: string, anthropic?: string }) => {
-    if (keys.google !== undefined) { setGoogleKey(keys.google); localStorage.setItem('nexus_google_key', keys.google); }
+  const handleUpdateApiKeys = (keys: { google?: string, openai?: string, anthropic?: string, deepseek?: string, grok?: string }) => {
     if (keys.openai !== undefined) { setOpenaiKey(keys.openai); localStorage.setItem('nexus_openai_key', keys.openai); }
     if (keys.anthropic !== undefined) { setAnthropicKey(keys.anthropic); localStorage.setItem('nexus_anthropic_key', keys.anthropic); }
+    if (keys.deepseek !== undefined) { setDeepseekKey(keys.deepseek); localStorage.setItem('nexus_deepseek_key', keys.deepseek); }
+    if (keys.grok !== undefined) { setGrokKey(keys.grok); localStorage.setItem('nexus_grok_key', keys.grok); }
   };
 
   const handleAuthSuccess = (ic: string, n: string, k: any, a?: string) => {
@@ -114,11 +115,13 @@ function App() {
   const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim() || isLoading || !user) return;
 
-    // Detect Active Provider Key
+    // Key Detection
     let providerKey = "";
     if (selectedModel.provider === 'openai') providerKey = openaiKey;
     else if (selectedModel.provider === 'anthropic') providerKey = anthropicKey;
-    else if (selectedModel.provider === 'google') providerKey = googleKey || (process.env.API_KEY as string);
+    else if (selectedModel.provider === 'deepseek') providerKey = deepseekKey;
+    else if (selectedModel.provider === 'grok') providerKey = grokKey;
+    else if (selectedModel.provider === 'google') providerKey = process.env.API_KEY as string;
 
     let targetId = currentSessionId;
     let target = sessions.find(s => s.id === targetId);
@@ -133,20 +136,18 @@ function App() {
 
     const text = inputValue.trim();
     setInputValue("");
-    
-    // Push User Query
     target.messages.push({ id: uuidv4(), role: Role.USER, text, timestamp: Date.now() });
     target.updatedAt = Date.now();
     updated = [target, ...updated.filter(s => s.id !== targetId)];
     setSessions(updated);
     localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(updated));
 
-    // KEY CHECK: If no key, show dedicated error bubble
-    if (!providerKey || providerKey.trim() === "") {
+    // Handle required keys for non-Google providers
+    if (selectedModel.provider !== 'google' && (!providerKey || providerKey.trim() === "")) {
       target.messages.push({ 
         id: uuidv4(), 
         role: Role.MODEL, 
-        text: `Error: No API key provided for ${selectedModel.provider.toUpperCase()}. Please link your credentials in the Settings menu to enable the Mothership uplink.`, 
+        text: `Error: No API key provided for ${selectedModel.provider.toUpperCase()}. Please configure it in Settings to link with the Mothership.`, 
         isError: true, 
         timestamp: Date.now() 
       });
@@ -161,13 +162,8 @@ function App() {
       target.messages.push({ id: mid, role: Role.MODEL, text: "", timestamp: Date.now() });
       setSessions([...updated]);
       
-      const activeMemories = globalMemories.filter(m => m.enabled).map(m => `- ${m.content}`).join('\n');
-      const memoryContext = activeMemories 
-        ? `\n[MEMBERED_FACTS]:\n${activeMemories}\nUse these memories to personalize your response.` 
-        : "";
-      
       const persona = PERSONAS.find(p => p.id === currentPersonaId)?.instruction || "";
-      const sys = (language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN) + memoryContext + "\n" + persona;
+      const sys = (language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN) + "\n" + persona;
       
       const res = await streamGeminiResponse(
         selectedModel, target.messages.slice(0, -1), text, sys, 
@@ -183,16 +179,13 @@ function App() {
       );
       
       const final = target.messages.find(m => m.id === mid);
-      if (final) { 
-        final.text = res.text; 
-        final.groundingMetadata = res.groundingMetadata; 
-      }
+      if (final) { final.text = res.text; final.groundingMetadata = res.groundingMetadata; }
       localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(updated));
     } catch (e: any) {
       target.messages.push({ id: uuidv4(), role: Role.MODEL, text: `Operational Error: ${e.message}`, isError: true, timestamp: Date.now() });
       setSessions([...updated]);
     } finally { setIsLoading(false); }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, googleKey, anthropicKey, language, currentPersonaId, globalMemories]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, anthropicKey, deepseekKey, grokKey, language, currentPersonaId]);
 
   if (!user) return <AuthScreen onAuthSuccess={handleAuthSuccess} language={language} />;
 
@@ -209,7 +202,7 @@ function App() {
         user={user} onLogout={() => { localStorage.removeItem('nexus_user_v2'); setUser(null); }} language={language}
         onToggleLanguage={() => setLanguage(language === 'en' ? 'zh' : 'en')} 
         currentPersonaId={currentPersonaId} onUpdatePersona={setCurrentPersonaId}
-        apiKeys={{ google: googleKey, openai: openaiKey, anthropic: anthropicKey }}
+        apiKeys={{ google: "", openai: openaiKey, anthropic: anthropicKey, deepseek: deepseekKey, grok: grokKey }}
         onUpdateApiKeys={handleUpdateApiKeys}
       />
 
@@ -219,6 +212,19 @@ function App() {
              <div className="flex items-center gap-2">
                <div className="w-2 h-2 rounded-full bg-nexus-accent shadow-[0_0_8px_rgba(6,182,212,0.8)] animate-pulse"></div>
                <span className="text-xs font-black font-mono text-nexus-accent uppercase tracking-widest">Nexus_Uplink</span>
+             </div>
+             
+             {/* Model Selector in Header */}
+             <div className="flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/5 rounded-full">
+                <select 
+                  value={selectedModel.id}
+                  onChange={(e) => setSelectedModel(GEMINI_MODELS.find(m => m.id === e.target.value) || GEMINI_MODELS[3])}
+                  className="bg-transparent text-[10px] font-bold text-gray-400 outline-none cursor-pointer uppercase tracking-tighter"
+                >
+                  {GEMINI_MODELS.map(m => (
+                    <option key={m.id} value={m.id} className="bg-nexus-900">{m.name} ({m.provider})</option>
+                  ))}
+                </select>
              </div>
           </div>
 
@@ -246,7 +252,7 @@ function App() {
               <div className="space-y-6 pb-24">
                 {currentMessages.map((msg) => (
                   <MessageBubble key={msg.id} message={msg} apiContext={{ 
-                    apiKey: (selectedModel.provider === 'openai' ? openaiKey : (selectedModel.provider === 'anthropic' ? anthropicKey : googleKey)), 
+                    apiKey: (selectedModel.provider === 'openai' ? openaiKey : (selectedModel.provider === 'anthropic' ? anthropicKey : (selectedModel.provider === 'deepseek' ? deepseekKey : (selectedModel.provider === 'grok' ? grokKey : "")))), 
                     provider: selectedModel.provider 
                   }} />
                 ))}
