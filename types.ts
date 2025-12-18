@@ -1,3 +1,4 @@
+
 export enum Role {
   USER = 'user',
   MODEL = 'model'
@@ -71,8 +72,10 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  avatar?: string; // Base64 string
+  avatar?: string;
   isGoogleLinked?: boolean;
+  isAdmin?: boolean;
+  inviteCode?: string;
 }
 
 export interface Persona {
