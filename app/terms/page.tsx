@@ -1,6 +1,6 @@
 export default function Terms() {
   return (
-    <main style={{ padding: 32 }}>
+    <main style={{ padding: 24 }}>
       <h1>Terms of Service</h1>
       <p>
         By using NEXUS-AI, you agree to use the service responsibly.
