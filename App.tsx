@@ -3,9 +3,7 @@ import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
 import AuthScreen from './components/AuthScreen';
 import { 
-  SendIcon, MenuIcon, BroomIcon, GoogleIcon, 
-  OpenAIIcon, BrainIcon, PinIcon, CommandIcon, LabIcon,
-  MemoryIcon
+  SendIcon, BroomIcon, BrainIcon, PinIcon, LabIcon, MemoryIcon
 } from './components/Icon';
 import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, UI_TEXT, PERSONAS } from './constants';
 import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, GlobalMemory } from './types';
@@ -24,12 +22,7 @@ function App() {
   const [pinnedItems, setPinnedItems] = useState<ChatMessage[]>([]);
   const [globalMemories, setGlobalMemories] = useState<GlobalMemory[]>([]);
   
-  const [commandBarOpen, setCommandBarOpen] = useState(false);
-  const [commandSearch, setCommandSearch] = useState("");
-  
   const [currentPersonaId, setCurrentPersonaId] = useState<string>('default');
-  const [useSearch, setUseSearch] = useState(false);
-  const [useThinking, setUseThinking] = useState(false);
 
   const sessionsControl = useHistory<ChatSession[]>([]);
   const sessions = sessionsControl.state;
@@ -48,15 +41,7 @@ function App() {
 
   const t = UI_TEXT[language];
 
-  // Hotkeys
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setCommandBarOpen(prev => !prev); }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
+  // 初始化加载本地数据
   useEffect(() => {
     const storedUser = localStorage.getItem('nexus_user_v2');
     const storedOpenAI = localStorage.getItem('nexus_openai_key');
@@ -75,6 +60,7 @@ function App() {
     if (storedMemories) { try { setGlobalMemories(JSON.parse(storedMemories)); } catch(e) {} }
   }, []);
 
+  // 加载用户会话
   useEffect(() => {
     if (user) {
       const stored = localStorage.getItem(`nexus_sessions_global_${user.id}`);
@@ -88,21 +74,10 @@ function App() {
     }
   }, [user]);
 
-  const saveSessionsToStorage = (updated: ChatSession[], userId: string) => {
-    localStorage.setItem(`nexus_sessions_global_${userId}`, JSON.stringify(updated));
-  };
-
   const handleUpdateApiKeys = (keys: { google?: string, openai?: string, anthropic?: string }) => {
     if (keys.google !== undefined) { setGoogleKey(keys.google); localStorage.setItem('nexus_google_key', keys.google); }
     if (keys.openai !== undefined) { setOpenaiKey(keys.openai); localStorage.setItem('nexus_openai_key', keys.openai); }
     if (keys.anthropic !== undefined) { setAnthropicKey(keys.anthropic); localStorage.setItem('nexus_anthropic_key', keys.anthropic); }
-  };
-
-  const handleAuthSuccess = (inviteCode: string, name: string, keys: { openai?: string, google?: string, anthropic?: string }, avatar?: string) => {
-    const u = { id: btoa(inviteCode + name), name, email: inviteCode, avatar };
-    setUser(u);
-    handleUpdateApiKeys(keys);
-    localStorage.setItem('nexus_user_v2', JSON.stringify(u));
   };
 
   const addMemory = (content: string) => {
@@ -134,7 +109,7 @@ function App() {
     target.updatedAt = Date.now();
     updated = [target, ...updated.filter(s => s.id !== targetId)];
     setSessions(updated);
-    saveSessionsToStorage(updated, user.id);
+    localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(updated));
     setIsLoading(true);
 
     try {
@@ -142,8 +117,9 @@ function App() {
       target.messages.push({ id: mid, role: Role.MODEL, text: "", timestamp: Date.now() });
       setSessions([...updated]);
       
+      // 神经记忆注入 (Neural Memory Injection)
       const activeMemories = globalMemories.filter(m => m.enabled).map(m => `- ${m.content}`).join('\n');
-      const memoryContext = activeMemories ? `\n[MEMBERED USER FACTS & PREFERENCES]:\n${activeMemories}\n` : "";
+      const memoryContext = activeMemories ? `\n[CRITICAL_USER_MEMORIES_AND_FACTS]:\n${activeMemories}\n` : "";
       
       const persona = PERSONAS.find(p => p.id === currentPersonaId)?.instruction || "";
       const sys = (language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN) + memoryContext + "\n" + persona;
@@ -158,31 +134,35 @@ function App() {
             if (m) m.text = txt;
             return n;
           }, true);
-        }, providerKey,
-        { useSearch: useSearch && selectedModel.provider === 'google', useThinking: useThinking && selectedModel.provider === 'google' }
+        }, providerKey
       );
       
       const final = target.messages.find(m => m.id === mid);
       if (final) { final.text = res.text; final.groundingMetadata = res.groundingMetadata; }
-      saveSessionsToStorage(updated, user.id);
+      localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(updated));
     } catch (e) {
       target.messages.push({ id: uuidv4(), role: Role.MODEL, text: `Error: ${e.message}`, isError: true, timestamp: Date.now() });
       setSessions([...updated]);
     } finally { setIsLoading(false); }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, googleKey, anthropicKey, language, currentPersonaId, useSearch, useThinking, globalMemories]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, googleKey, anthropicKey, language, currentPersonaId, globalMemories]);
 
-  if (!user) return <AuthScreen onAuthSuccess={handleAuthSuccess} language={language} />;
+  if (!user) return <AuthScreen onAuthSuccess={(ic, n, k, a) => {
+    const u = { id: btoa(ic + n), name: n, email: ic, avatar: a };
+    setUser(u);
+    handleUpdateApiKeys(k);
+    localStorage.setItem('nexus_user_v2', JSON.stringify(u));
+  }} language={language} />;
 
   const currentMessages = sessions.find(s => s.id === currentSessionId)?.messages || [];
 
   return (
     <div className="flex h-screen mothership-bg text-slate-300 font-sans overflow-hidden">
       
-      {/* Permanent Sidebar (No Toggle) */}
+      {/* 侧边栏永久固定 */}
       <Sidebar 
         isOpen={true} sessions={sessions} currentSessionId={currentSessionId} 
-        onNewChat={() => { setCurrentSessionId(null); }}
-        onSelectSession={(id) => { setCurrentSessionId(id); }}
+        onNewChat={() => setCurrentSessionId(null)}
+        onSelectSession={setCurrentSessionId}
         onDeleteSession={(id, e) => { e.stopPropagation(); setSessions(sessions.filter(s => s.id !== id)); }} 
         user={user} onLogout={() => setUser(null)} language={language}
         onToggleLanguage={() => setLanguage(language === 'en' ? 'zh' : 'en')} 
@@ -191,74 +171,42 @@ function App() {
         onUpdateApiKeys={handleUpdateApiKeys}
       />
 
-      <div className={`flex-1 flex flex-col relative transition-all duration-300 ${labOpen ? 'mr-64' : 'mr-0'}`}>
-        {/* Minimized Header */}
+      <div className={`flex-1 flex flex-col relative transition-all duration-300 ${labOpen ? 'mr-56' : 'mr-0'}`}>
+        {/* 极致精简页眉 */}
         <header className="h-10 flex items-center justify-between px-4 z-20 border-b border-white/5 bg-nexus-900/40">
-          <div className="flex items-center gap-3">
-            <div className="glass-panel px-2 py-0.5 rounded-md flex items-center gap-2 border-white/5 shadow-sm">
-               <div className="flex items-center gap-1.5 text-[8px] font-black font-mono tracking-widest text-cyan-400">
-                 <span className={`w-1 h-1 rounded-full ${isLoading ? 'bg-cyan-400 animate-pulse' : 'bg-emerald-500'}`}></span> LIVE
+          <div className="flex items-center gap-2">
+            <div className="glass-panel px-2 py-0.5 rounded-md flex items-center gap-2 border-white/5">
+               <div className="text-[8px] font-black font-mono text-cyan-400">
+                 <span className={`inline-block w-1 h-1 rounded-full mr-1 ${isLoading ? 'bg-cyan-400 animate-pulse' : 'bg-emerald-500'}`}></span>
+                 SYNC_OK
                </div>
-               <div className="h-2 w-px bg-white/10"></div>
-               <button onClick={() => setCommandBarOpen(true)} className="flex items-center gap-1.5 text-[8px] text-gray-500 hover:text-white transition-all uppercase font-bold">
-                  <span className="bg-white/5 px-1 rounded border border-white/5 font-mono text-nexus-accent">⌘K</span>
-                  SWITCH
-               </button>
             </div>
           </div>
 
           <button 
             onClick={() => setLabOpen(!labOpen)} 
-            className={`p-1.5 rounded-md glass-panel transition-all duration-300 ${labOpen ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-glow' : 'hover:bg-white/5 text-gray-600'}`}
+            className={`p-1.5 rounded-md glass-panel ${labOpen ? 'text-cyan-400 border-cyan-500/20' : 'text-gray-600'}`}
           >
             <LabIcon />
           </button>
         </header>
 
-        {/* Dense Stream */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8 custom-scrollbar">
-          <div className="max-w-2xl mx-auto min-h-full flex flex-col">
+        {/* 聊天消息流 */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 custom-scrollbar">
+          <div className="max-w-xl mx-auto min-h-full flex flex-col">
             {currentMessages.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 py-10 animate-in fade-in duration-500">
-                <div className="w-16 h-16 glass-panel rounded-xl flex items-center justify-center shadow-xl border-white/10 opacity-60">
-                  <BrainIcon />
-                </div>
-                <div>
-                  <h1 className="text-xl font-black italic tracking-tighter text-white">NEXUS<span className="text-cyan-400 font-mono">_OS</span></h1>
-                  <p className="text-[9px] text-gray-600 font-mono uppercase tracking-[0.2em]">Neural Node Ready</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 w-full max-w-sm">
-                   {["Recall preferences", "Analyze markets", "Debug architecture", "Logic simulation"].map((p, i) => (
-                    <button key={i} onClick={() => setInputValue(p)} className="p-2.5 prism-card rounded-lg text-left text-[10px] font-bold text-gray-500 hover:text-cyan-400 transition-all">
-                      {p}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex-1 flex flex-col items-center justify-center py-10 opacity-60">
+                <div className="w-10 h-10 glass-panel rounded-xl flex items-center justify-center mb-4"><BrainIcon /></div>
+                <h1 className="text-base font-black italic text-white uppercase tracking-tighter">Nexus_Core</h1>
+                <p className="text-[7px] text-gray-700 font-mono tracking-[0.3em] mt-1 uppercase">Ready_for_Input</p>
               </div>
             ) : (
-              <div className="space-y-4 pb-28">
+              <div className="space-y-4 pb-20">
                 {currentMessages.map((msg) => (
-                  <div key={msg.id} className="relative group/msg">
-                    <MessageBubble 
-                      message={msg} 
-                      apiContext={{ 
-                        apiKey: (selectedModel.provider === 'openai' ? openaiKey : (selectedModel.provider === 'anthropic' ? anthropicKey : googleKey)), 
-                        provider: selectedModel.provider 
-                      }} 
-                    />
-                    {msg.role === Role.MODEL && !msg.isError && (
-                      <button onClick={() => {
-                        setPinnedItems(prev => {
-                          const n = [msg, ...prev];
-                          localStorage.setItem('nexus_pinned', JSON.stringify(n));
-                          if (!labOpen) setLabOpen(true);
-                          return n;
-                        });
-                      }} className="absolute -right-5 top-1 p-1 glass-panel rounded-md opacity-0 group-hover/msg:opacity-100 transition-all text-gray-600 hover:text-cyan-400 scale-75">
-                        <PinIcon />
-                      </button>
-                    )}
-                  </div>
+                  <MessageBubble key={msg.id} message={msg} apiContext={{ 
+                    apiKey: (selectedModel.provider === 'openai' ? openaiKey : (selectedModel.provider === 'anthropic' ? anthropicKey : googleKey)), 
+                    provider: selectedModel.provider 
+                  }} />
                 ))}
                 <div ref={messagesEndRef} />
               </div>
@@ -266,10 +214,10 @@ function App() {
           </div>
         </div>
 
-        {/* Minimal Input */}
+        {/* 输入框收紧 */}
         <div className="px-4 py-3 absolute bottom-0 left-0 right-0 pointer-events-none">
-          <div className="max-w-xl mx-auto glass-panel p-1 rounded-xl shadow-2xl pointer-events-auto border-white/5 ring-1 ring-white/10">
-            <div className="flex items-center gap-1.5">
+          <div className="max-w-lg mx-auto glass-panel p-1 rounded-xl pointer-events-auto border-white/5 ring-1 ring-white/5">
+            <div className="flex items-center gap-1">
                <textarea 
                 ref={textareaRef}
                 rows={1}
@@ -277,44 +225,40 @@ function App() {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                 placeholder={t.placeholder}
-                className="flex-1 bg-transparent text-white px-3 py-1.5 focus:outline-none resize-none overflow-hidden text-[11px] font-medium leading-relaxed max-h-24 custom-scrollbar"
+                className="flex-1 bg-transparent text-white px-3 py-1.5 focus:outline-none resize-none text-[10px] font-medium leading-relaxed max-h-24"
                />
-               <div className="flex items-center gap-1 pr-1">
-                 <button onClick={() => setInputValue("")} className="p-1.5 text-gray-700 hover:text-red-400 transition-all scale-90"><BroomIcon /></button>
-                 <button onClick={handleSendMessage} disabled={isLoading || !inputValue.trim()} className={`p-2 rounded-lg transition-all ${inputValue.trim() && !isLoading ? 'bg-cyan-500 text-black shadow-lg' : 'bg-white/5 text-gray-700 opacity-30 cursor-not-allowed'}`}>
-                   {isLoading ? <div className="w-3.5 h-3.5 border-2 border-black/20 border-t-black rounded-full animate-spin"></div> : <SendIcon />}
-                 </button>
-               </div>
+               <button onClick={handleSendMessage} disabled={isLoading || !inputValue.trim()} className={`p-2 rounded-lg transition-all ${inputValue.trim() && !isLoading ? 'bg-cyan-500 text-black' : 'bg-white/5 text-gray-700 opacity-20'}`}>
+                 {isLoading ? <div className="w-3 h-3 border-2 border-black/20 border-t-black rounded-full animate-spin"></div> : <SendIcon />}
+               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Lab Area - Thinner */}
-      <aside className={`fixed inset-y-0 right-0 z-40 w-64 glass-panel border-l transform transition-all duration-300 ${labOpen ? 'translate-x-0' : 'translate-x-full'} shadow-2xl flex flex-col bg-nexus-950/40 backdrop-blur-3xl`}>
+      {/* 右侧 Lab 指挥台 (常驻窄栏) */}
+      <aside className={`fixed inset-y-0 right-0 z-40 w-56 glass-panel border-l transform transition-all duration-300 ${labOpen ? 'translate-x-0' : 'translate-x-full'} bg-nexus-950/40 backdrop-blur-3xl`}>
         <div className="p-3 border-b border-white/5 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[10px] font-black tracking-widest text-white uppercase">
+          <div className="text-[8px] font-black tracking-widest text-white uppercase flex items-center gap-1.5">
              <LabIcon /> WORKSPACE
           </div>
-          <button onClick={() => setLabOpen(false)} className="text-gray-600 hover:text-white text-xs">✕</button>
+          <button onClick={() => setLabOpen(false)} className="text-gray-600 text-[10px]">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-4 custom-scrollbar">
-           {/* Memory persistence UI */}
            <section>
-              <h3 className="text-[8px] font-black text-gray-600 uppercase tracking-widest mb-2 flex items-center gap-1.5"><MemoryIcon /> NEURAL MEMORY</h3>
+              <h3 className="text-[7px] font-black text-gray-600 uppercase mb-2 flex items-center gap-1.5 tracking-tighter"><MemoryIcon /> NEURAL_MEMORY</h3>
               <div className="space-y-1.5">
                  <input 
                   type="text" 
                   placeholder="Fact to record..."
-                  className="w-full bg-white/5 border border-white/5 rounded-md px-2 py-1.5 text-[10px] text-white focus:outline-none focus:border-cyan-500/20"
+                  className="w-full bg-white/5 border border-white/5 rounded px-2 py-1 text-[9px] text-white focus:outline-none focus:border-cyan-500/20"
                   onKeyDown={(e) => { if (e.key === 'Enter') { addMemory((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; } }}
                  />
-                 <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+                 <div className="space-y-1 max-h-60 overflow-y-auto">
                    {globalMemories.map(mem => (
-                     <div key={mem.id} className="p-2 prism-card rounded-md flex items-center justify-between group/mem">
+                     <div key={mem.id} className="p-2 prism-card rounded flex items-center justify-between group/mem">
                         <p className="text-[9px] text-gray-400 leading-tight flex-1 line-clamp-2">{mem.content}</p>
-                        <button onClick={() => setGlobalMemories(p => p.filter(m => m.id !== mem.id))} className="opacity-0 group-hover/mem:opacity-100 text-gray-700 hover:text-red-400 ml-1 scale-75">✕</button>
+                        <button onClick={() => setGlobalMemories(p => p.filter(m => m.id !== mem.id))} className="opacity-0 group-hover/mem:opacity-100 text-red-400/50 hover:text-red-400 ml-1">✕</button>
                      </div>
                    ))}
                  </div>
@@ -323,55 +267,19 @@ function App() {
 
            <div className="h-px bg-white/5"></div>
 
-           {/* Snippets UI */}
            <section>
-              <h3 className="text-[8px] font-black text-gray-600 uppercase tracking-widest mb-2 flex items-center gap-1.5"><PinIcon /> SNAPSHOTS</h3>
+              <h3 className="text-[7px] font-black text-gray-600 uppercase mb-2 flex items-center gap-1.5 tracking-tighter"><PinIcon /> SNIPPETS</h3>
               <div className="space-y-2">
                 {pinnedItems.map((item) => (
-                  <div key={item.id} className="p-2 prism-card rounded-lg relative group animate-in slide-in-from-right-1">
-                      <button onClick={() => setPinnedItems(p => p.filter(i => i.id !== item.id))} className="absolute top-1 right-1 text-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity scale-75">✕</button>
-                      <div className="text-[9px] text-gray-500 line-clamp-4 leading-normal">{item.text}</div>
+                  <div key={item.id} className="p-2 prism-card rounded relative group">
+                      <button onClick={() => setPinnedItems(p => p.filter(i => i.id !== item.id))} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-gray-600 scale-75">✕</button>
+                      <div className="text-[9px] text-gray-500 line-clamp-3 leading-normal">{item.text}</div>
                   </div>
                 ))}
               </div>
            </section>
         </div>
       </aside>
-
-      {/* Command Palette */}
-      {commandBarOpen && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[10vh] px-4 backdrop-blur-xl bg-black/40" onClick={() => setCommandBarOpen(false)}>
-          <div className="glass-panel w-full max-w-sm rounded-xl overflow-hidden shadow-2xl border-white/10" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
-              <CommandIcon />
-              <input 
-                autoFocus
-                type="text" 
-                placeholder="Search Neurons..." 
-                className="bg-transparent border-none outline-none flex-1 text-xs text-white placeholder-gray-600"
-                value={commandSearch}
-                onChange={e => setCommandSearch(e.target.value)}
-              />
-            </div>
-            <div className="max-h-[30vh] overflow-y-auto p-1.5 custom-scrollbar">
-              {GEMINI_MODELS.filter(m => m.name.toLowerCase().includes(commandSearch.toLowerCase())).map(model => (
-                <button key={model.id} onClick={() => { setSelectedModel(model); setCommandBarOpen(false); }} className={`w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 flex items-center justify-between group transition-all ${selectedModel.id === model.id ? 'bg-cyan-500/10' : ''}`}>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded-md flex items-center justify-center scale-90 ${model.provider === 'google' ? 'bg-cyan-500/10 text-cyan-400' : (model.provider === 'anthropic' ? 'bg-orange-500/10 text-orange-400' : 'bg-fuchsia-500/10 text-fuchsia-400')}`}>
-                      {model.provider === 'google' ? <GoogleIcon /> : <OpenAIIcon />}
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-bold text-white group-hover:text-cyan-400">{model.name}</div>
-                      <div className="text-[8px] text-gray-500 uppercase">{model.provider}</div>
-                    </div>
-                  </div>
-                  {selectedModel.id === model.id && <div className="text-cyan-400 text-[10px]">●</div>}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
