@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, Role, AIProvider } from '../types';
-import { RobotIcon, UserIcon, CopyIcon, CheckIcon, SpeakerIcon, StopIcon, XIcon, GlobeIcon, LinkIcon } from './Icon';
+import { RobotIcon, UserIcon, CopyIcon, CheckIcon, SpeakerIcon, StopIcon, XIcon, GlobeIcon, LinkIcon, GitHubIcon } from './Icon';
 import { generateSpeech } from '../services/geminiService';
 import { playAudioContent } from '../utils/audio';
 
@@ -243,6 +243,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
                <div className="grid grid-cols-1 gap-2">
                  {message.groundingMetadata?.groundingChunks?.map((chunk, idx) => {
                    if (!chunk.web) return null;
+                   const isGitHub = chunk.web.uri.includes('github.com');
+                   
                    return (
                      <a 
                        key={idx} 
@@ -251,12 +253,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
                        rel="noopener noreferrer"
                        className="flex items-center gap-3 p-2 rounded-lg bg-nexus-900/50 hover:bg-nexus-700 border border-nexus-700/50 hover:border-nexus-600 transition-all group/link"
                      >
-                       <div className="p-1.5 rounded-full bg-nexus-800 text-nexus-accent/70 group-hover/link:text-nexus-accent group-hover/link:bg-nexus-700/50">
-                         <LinkIcon />
+                       <div className={`p-1.5 rounded-full ${isGitHub ? 'bg-black text-white' : 'bg-nexus-800 text-nexus-accent/70'} group-hover/link:scale-110 transition-transform`}>
+                         {isGitHub ? <GitHubIcon /> : <LinkIcon />}
                        </div>
                        <div className="flex-1 min-w-0">
-                         <div className="text-xs font-medium text-gray-300 truncate group-hover/link:text-white">
-                           {chunk.web.title}
+                         <div className="flex items-center gap-2">
+                           <div className="text-xs font-medium text-gray-300 truncate group-hover/link:text-white">
+                             {chunk.web.title}
+                           </div>
+                           {isGitHub && <span className="text-[9px] bg-white/10 text-white/60 px-1 rounded font-mono">REPO</span>}
                          </div>
                          <div className="text-[10px] text-gray-500 truncate font-mono">
                            {new URL(chunk.web.uri).hostname}

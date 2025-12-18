@@ -94,6 +94,12 @@ export const PERSONAS: Persona[] = [
     instruction: 'You are an expert Senior Software Engineer. You prefer concise, technical answers. You always provide code snippets in best-practice patterns. You focus on performance, scalability, and clean code.'
   },
   {
+    id: 'github',
+    name: 'GitHub Analyst',
+    description: 'Specialist in repo analysis and OS trends.',
+    instruction: 'You are a GitHub specialist. When analyzing repositories, you focus on commit frequency, issue velocity, architectural patterns, and licensing. You help users understand open source ecosystems and CI/CD pipelines.'
+  },
+  {
     id: 'creative',
     name: 'Creative Writer',
     description: 'Imaginative, descriptive, and engaging.',
@@ -122,9 +128,9 @@ export const validateInviteCode = (code: string): boolean => {
   return num >= 1 && num <= 1000;
 };
 
-export const SYSTEM_INSTRUCTION_EN = `You are Nexus, a helpful AI assistant. Use Markdown for formatting code.`;
+export const SYSTEM_INSTRUCTION_EN = `You are Nexus, a helpful AI assistant. Use Markdown for formatting code. If users ask about code repositories, use real-time search to verify details on GitHub.`;
 
-export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus，一个有用的人工智能助手。请使用 Markdown 格式化代码。`;
+export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus，一个有用的人工智能助手。请使用 Markdown 格式化代码。如果用户询问代码仓库，请使用实时搜索来验证 GitHub 上的详细信息。`;
 
 export const CONTACT_EMAIL = "121nexusaicontact@gmail.com";
 
@@ -267,7 +273,7 @@ export const USER_GUIDE = {
     },
     {
       title: "4. Personas & Settings",
-      content: "Use Settings to link accounts, manage API keys, and change the AI's personality (e.g., Developer, Creative Writer)."
+      content: "Use Settings to link accounts, manage API keys, and change the AI's personality (e.g., Developer, GitHub Analyst)."
     },
     {
       title: "5. Search & Organization",
@@ -289,7 +295,7 @@ export const USER_GUIDE = {
     },
     {
       title: "4. 人格与设置",
-      content: "在设置中关联账号、管理 API 密钥，以及更改 AI 的性格（如：程序员专家、创意作家）。"
+      content: "在设置中关联账号、管理 API 密钥，以及更改 AI 的性格（如：程序员专家、GitHub 分析师）。"
     },
     {
       title: "5. 搜索与整理",
