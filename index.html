@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nexus Core AI</title>
+    <title>Nexus Core AI | Mothership</title>
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,11 +15,7 @@
 
     <!-- Environment Polyfill -->
     <script>
-      window.process = {
-        env: {
-          NODE_ENV: 'development'
-        }
-      };
+      window.process = { env: { NODE_ENV: 'development' } };
     </script>
 
     <!-- Tailwind Config -->
@@ -35,15 +31,24 @@
             },
             colors: {
               nexus: {
-                900: '#0f172a', // Main bg
-                800: '#1e293b', // Secondary bg
-                700: '#334155', // Borders
-                accent: '#3b82f6', // Primary Blue
-                accentHover: '#2563eb',
+                950: '#020617', // Deep Space
+                900: '#0a0f1e', // Main bg
+                800: '#141c2f', // Secondary bg
+                700: '#1e293b', // Borders
+                accent: '#06b6d4', // Cyan Neon
+                purple: '#d946ef', // Magenta Neon
+                emerald: '#10b981', // Emerald
               }
             },
             animation: {
-              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'glow': 'glow 3s ease-in-out infinite',
+            },
+            keyframes: {
+              glow: {
+                '0%, 100%': { filter: 'drop-shadow(0 0 5px rgba(6, 182, 212, 0.2))' },
+                '50%': { filter: 'drop-shadow(0 0 15px rgba(6, 182, 212, 0.4))' },
+              }
             }
           }
         }
@@ -51,20 +56,61 @@
     </script>
 
     <style>
-      /* Custom Scrollbar for Webkit */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+      ::-webkit-scrollbar { width: 3px; height: 3px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(6, 182, 212, 0.3); }
+
+      .glass-panel {
+        background: rgba(10, 15, 30, 0.7);
+        backdrop-filter: blur(16px) saturate(160%);
+        border: 0.5px solid rgba(255, 255, 255, 0.08);
       }
-      ::-webkit-scrollbar-track {
-        background: #0f172a; 
+      
+      .mothership-bg {
+        background-color: #020617;
+        background-image: 
+          radial-gradient(at 0% 0%, hsla(180,100%,50%,0.03) 0, transparent 50%), 
+          radial-gradient(at 100% 0%, hsla(280,100%,50%,0.03) 0, transparent 50%);
       }
-      ::-webkit-scrollbar-thumb {
-        background: #334155; 
-        border-radius: 4px;
+
+      .prism-card {
+        background: rgba(255,255,255,0.02);
+        border: 0.5px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.2s ease;
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #475569; 
+
+      .prism-card:hover {
+        border-color: rgba(6, 182, 212, 0.2);
+        background: rgba(255,255,255,0.04);
+      }
+
+      .iphone-modal {
+        background: rgba(20, 25, 40, 0.95);
+        backdrop-filter: blur(30px);
+      }
+
+      .iphone-group {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 14px;
+        overflow: hidden;
+      }
+
+      .iphone-row {
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+        transition: background 0.2s;
+      }
+
+      .iphone-row:last-child {
+        border-bottom: none;
+      }
+
+      .iphone-row:active {
+        background: rgba(255, 255, 255, 0.1);
       }
     </style>
 
@@ -80,7 +126,7 @@
     }
     </script>
   </head>
-  <body class="bg-nexus-900 text-slate-200 dark:bg-nexus-900 dark:text-slate-200 h-screen overflow-hidden selection:bg-nexus-accent/30">
+  <body class="mothership-bg text-slate-300 h-screen overflow-hidden selection:bg-nexus-accent/30 selection:text-white text-sm">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
   </body>

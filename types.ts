@@ -58,6 +58,13 @@ export interface ChatSession {
   updatedAt: number;
 }
 
+export interface GlobalMemory {
+  id: string;
+  content: string;
+  enabled: boolean;
+  timestamp: number;
+}
+
 export type Language = 'en' | 'zh';
 
 export interface User {
