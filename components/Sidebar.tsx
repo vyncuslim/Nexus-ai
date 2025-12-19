@@ -109,43 +109,44 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-4 custom-scrollbar">
-            {/* Memory Archive Section */}
-            <div className="px-2 mt-2">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] flex items-center gap-2"><MemoryIcon /> Neural_Archive</span>
+            {/* NEW MANUAL MEMORY ADDITION SECTION */}
+            <div className="px-3 mt-2 py-3 bg-white/[0.02] rounded-3xl border border-white/5">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] flex items-center gap-2"><MemoryIcon /> Neural_Memory</span>
               </div>
-              <div className="flex gap-2 mb-3">
+              <div className="flex flex-col gap-2">
                 <input 
                   type="text" 
                   value={newMemory}
                   onChange={(e) => setNewMemory(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && submitMemory()}
-                  placeholder="Fact to remember..."
-                  className="flex-1 bg-white/2 border border-white/5 rounded-xl px-3 py-2 text-[10px] text-white focus:outline-none focus:border-nexus-accent/30"
+                  placeholder="Tell Nexus something..."
+                  className="w-full bg-black/40 border border-white/5 rounded-2xl px-3 py-2.5 text-[11px] text-white focus:outline-none focus:border-nexus-accent/30 placeholder-gray-800 transition-all"
                 />
                 <button 
                   onClick={submitMemory}
-                  className="p-2 glass-panel rounded-xl text-nexus-accent border-white/10 hover:bg-white/5"
+                  disabled={!newMemory.trim()}
+                  className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-[10px] font-black uppercase transition-all ${newMemory.trim() ? 'bg-nexus-accent text-black shadow-glow' : 'bg-white/5 text-gray-700 opacity-20'}`}
                 >
-                  <PlusIcon />
+                  <PlusIcon /> Commit To Core
                 </button>
               </div>
-              <div className="space-y-1">
+              
+              <div className="mt-4 space-y-1">
                 {globalMemories.slice(0, 3).map(mem => (
-                  <div key={mem.id} className="group flex items-center gap-2 p-2 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5">
+                  <div key={mem.id} className="group flex items-center gap-2 p-2 rounded-xl hover:bg-white/5 transition-all">
                     <div className="w-1 h-1 rounded-full bg-nexus-accent/40 group-hover:bg-nexus-accent"></div>
                     <span className="text-[10px] text-gray-500 truncate flex-1 uppercase tracking-tight">{mem.content}</span>
-                    <button onClick={() => onDeleteMemory(mem.id)} className="opacity-0 group-hover:opacity-100 text-[10px] text-red-500/50 hover:text-red-500">✕</button>
                   </div>
                 ))}
                 {globalMemories.length > 3 && (
-                  <button onClick={() => setShowSettingsModal(true)} className="text-[9px] text-gray-600 hover:text-white mt-1 px-3 py-1 font-bold uppercase tracking-widest italic">+ {globalMemories.length - 3} More Logs</button>
+                  <button onClick={() => setShowSettingsModal(true)} className="text-[9px] text-gray-600 hover:text-white mt-1 px-3 py-1 font-bold uppercase tracking-widest italic">+ {globalMemories.length - 3} Saved Patterns</button>
                 )}
               </div>
             </div>
 
             <div className="px-2 border-t border-white/5 pt-4">
-               <span className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] px-2 mb-2 block">Terminal_History</span>
+               <span className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] px-2 mb-2 block">Terminal_Uplinks</span>
                <div className="space-y-1">
                 {sessions.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase())).map(session => (
                   <div 
@@ -192,14 +193,17 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-nexus-950/40">
-                 {/* Memory Core Management */}
+                 {/* Memory Protocol Integration */}
                  <section>
                     <div className="px-2 mb-4 text-[10px] text-gray-600 uppercase font-black tracking-widest flex items-center gap-2">
-                       <MemoryIcon /> Neural_Memory_Core
+                       <MemoryIcon /> Neural_Recall_System
                     </div>
                     <div className="space-y-3 px-2">
-                       <div className="flex items-center justify-between p-4 glass-panel rounded-2xl border-white/5 mb-4">
-                          <div className="text-[10px] font-black uppercase tracking-widest text-gray-300">Active Recall Protocol</div>
+                       <div className="flex items-center justify-between p-4 bg-white/2 rounded-3xl border border-white/5 mb-4">
+                          <div className="flex flex-col">
+                             <span className="text-[10px] font-black uppercase tracking-widest text-gray-300">Recall_Protocol</span>
+                             <span className="text-[8px] text-gray-600 font-mono">ENHANCE PERSONALIZATION</span>
+                          </div>
                           <button 
                             onClick={() => setTempSettings({...tempSettings, useMemories: !tempSettings.useMemories})}
                             className={`w-12 h-6 rounded-full transition-all relative ${tempSettings.useMemories ? 'bg-nexus-accent shadow-glow' : 'bg-white/10'}`}
@@ -207,14 +211,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                              <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${tempSettings.useMemories ? 'left-7' : 'left-1'}`}></div>
                           </button>
                        </div>
-                       <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                       <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
                           {globalMemories.map(mem => (
-                            <div key={mem.id} className="p-3 bg-white/2 border border-white/5 rounded-xl flex items-center justify-between group">
-                               <span className="text-[10px] text-gray-400 uppercase font-mono">{mem.content}</span>
+                            <div key={mem.id} className="p-3 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between group">
+                               <span className="text-[10px] text-gray-400 uppercase font-mono line-clamp-2">{mem.content}</span>
                                <button onClick={() => onDeleteMemory(mem.id)} className="text-red-500/30 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-all">✕</button>
                             </div>
                           ))}
-                          {globalMemories.length === 0 && <div className="text-center py-4 text-[10px] text-gray-700 italic">No stored neural patterns</div>}
+                          {globalMemories.length === 0 && <div className="text-center py-6 border border-dashed border-white/5 rounded-3xl text-[10px] text-gray-800 italic uppercase">Core memory archive empty</div>}
                        </div>
                     </div>
                  </section>
@@ -242,34 +246,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <div className="space-y-6 px-2">
                        <div className="space-y-2">
                           <div className="flex justify-between text-[10px] font-mono uppercase tracking-tighter">
-                             <span className="text-gray-400">Temperature</span>
-                             <span className="text-nexus-accent">{tempSettings.temperature.toFixed(1)}</span>
-                          </div>
-                          <input 
-                            type="range" min="0" max="1" step="0.1" 
-                            value={tempSettings.temperature}
-                            onChange={(e) => setTempSettings({...tempSettings, temperature: parseFloat(e.target.value)})}
-                            className="w-full accent-nexus-accent opacity-70 hover:opacity-100"
-                          />
-                       </div>
-                       <div className="space-y-2">
-                          <div className="flex justify-between text-[10px] font-mono uppercase tracking-tighter">
-                             <span className="text-gray-400">Max Output Tokens</span>
-                             <span className="text-nexus-accent">{tempSettings.maxTokens}</span>
-                          </div>
-                          <input 
-                            type="range" min="256" max="8192" step="256" 
-                            value={tempSettings.maxTokens}
-                            onChange={(e) => setTempSettings({...tempSettings, maxTokens: parseInt(e.target.value)})}
-                            className="w-full accent-nexus-accent opacity-70 hover:opacity-100"
-                          />
-                       </div>
-                       
-                       {/* Thinking Budget Config */}
-                       <div className="space-y-2 border-t border-white/5 pt-4">
-                          <div className="flex justify-between text-[10px] font-mono uppercase tracking-tighter">
-                             <span className="text-gray-400">Thinking Budget (Gemini 3)</span>
-                             <span className="text-nexus-accent">{tempSettings.thinkingBudget}</span>
+                             <span className="text-gray-400">Thinking Budget</span>
+                             <span className="text-nexus-accent">{tempSettings.thinkingBudget} Tokens</span>
                           </div>
                           <input 
                             type="range" min="0" max="16384" step="1024" 
@@ -277,11 +255,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                             onChange={(e) => setTempSettings({...tempSettings, thinkingBudget: parseInt(e.target.value)})}
                             className="w-full accent-nexus-accent opacity-70 hover:opacity-100"
                           />
-                          <p className="text-[8px] text-gray-700 italic px-1 uppercase tracking-tighter leading-none">Allocate tokens for internal reasoning chains. Set to 0 to disable thinking.</p>
                        </div>
-
                        <div className="flex items-center justify-between p-4 glass-panel rounded-2xl border-white/5">
-                          <div className="text-[10px] font-black uppercase tracking-widest text-gray-300">Google Search Grounding</div>
+                          <div className="text-[10px] font-black uppercase tracking-widest text-gray-300">Live Web Grounding</div>
                           <button 
                             onClick={() => setTempSettings({...tempSettings, useSearch: !tempSettings.useSearch})}
                             className={`w-12 h-6 rounded-full transition-all relative ${tempSettings.useSearch ? 'bg-nexus-accent shadow-glow' : 'bg-white/10'}`}
@@ -289,46 +265,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                              <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${tempSettings.useSearch ? 'left-7' : 'left-1'}`}></div>
                           </button>
                        </div>
-                    </div>
-                 </section>
-
-                 <section>
-                    <div className="px-2 mb-4 text-[10px] text-gray-600 uppercase font-black tracking-widest flex items-center gap-2">
-                       <LinkIcon /> Neural_Providers
-                    </div>
-                    <div className="space-y-3">
-                      {[
-                        { id: 'deepseek', name: 'DeepSeek AI', icon: <DeepSeekIcon />, key: tempKeys.deepseek, ph: "DeepSeek API Key" },
-                        { id: 'grok', name: 'Grok xAI', icon: <GrokIcon />, key: tempKeys.grok, ph: "Grok API Key" },
-                        { id: 'openai', name: 'OpenAI', icon: <OpenAIIcon />, key: tempKeys.openai, ph: "OpenAI API Key (sk-...)" },
-                        { id: 'anthropic', name: 'Anthropic Claude', icon: <AnthropicIcon />, key: tempKeys.anthropic, ph: "Anthropic API Key" },
-                      ].map(provider => (
-                        <div key={provider.id} className="glass-panel rounded-2xl overflow-hidden border-white/5 transition-all">
-                          <div 
-                            onClick={() => setEditingProvider(editingProvider === provider.id ? null : provider.id)}
-                            className="flex items-center gap-4 py-4 px-5 cursor-pointer active:bg-white/5"
-                          >
-                            <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-nexus-accent border border-white/5">{provider.icon}</div>
-                            <div className="flex-1">
-                              <div className="text-xs text-gray-300 font-black uppercase tracking-tighter">{provider.name}</div>
-                              <div className="text-[8px] text-gray-600 font-mono tracking-widest mt-0.5">{provider.key ? 'ACTIVE_LINK' : 'OFFLINE'}</div>
-                            </div>
-                            <div className={`transition-transform duration-300 text-gray-700 ${editingProvider === provider.id ? 'rotate-180' : ''}`}><ChevronDownIcon /></div>
-                          </div>
-                          {editingProvider === provider.id && (
-                            <div className="px-5 pb-5 pt-0 animate-in slide-in-from-top-2">
-                              <input 
-                                type="password" 
-                                value={provider.key || ''} 
-                                onChange={(e) => setTempKeys(prev => ({ ...prev, [provider.id]: e.target.value }))}
-                                className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3.5 text-xs text-white font-mono focus:border-nexus-accent/50 outline-none shadow-inner"
-                                placeholder={provider.ph}
-                                autoFocus
-                              />
-                            </div>
-                          )}
-                        </div>
-                      ))}
                     </div>
                  </section>
               </div>

@@ -90,6 +90,8 @@ export interface AppSettings {
   maxTokens: number;
   useSearch: boolean;
   useMemories: boolean;
+  isAgentMode: boolean;
+  agentType: 'general' | 'researcher' | 'developer';
   thinkingBudget: number;
   accentColor: 'cyan' | 'purple' | 'emerald';
 }
