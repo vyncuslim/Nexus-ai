@@ -84,3 +84,12 @@ export interface Persona {
   description: string;
   instruction: string;
 }
+
+export interface AppSettings {
+  temperature: number;
+  maxTokens: number;
+  useSearch: boolean;
+  useMemories: boolean;
+  thinkingBudget: number;
+  accentColor: 'cyan' | 'purple' | 'emerald';
+}

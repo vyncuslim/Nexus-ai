@@ -7,7 +7,7 @@ import {
   SendIcon, BrainIcon, PinIcon, LabIcon, MemoryIcon, MenuIcon
 } from './components/Icon';
 import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, UI_TEXT, PERSONAS } from './constants';
-import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, GlobalMemory } from './types';
+import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, GlobalMemory, AppSettings } from './types';
 import { streamGeminiResponse } from './services/geminiService';
 import { useHistory } from './hooks/useHistory';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,38 +21,19 @@ function App() {
   
   const [language, setLanguage] = useState<Language>('en');
   const [labOpen, setLabOpen] = useState(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pinnedItems, setPinnedItems] = useState<ChatMessage[]>([]);
   const [globalMemories, setGlobalMemories] = useState<GlobalMemory[]>([]);
   
   const [currentPersonaId, setCurrentPersonaId] = useState<string>('default');
-
-  // Sidebar Resizing Logic
-  const [sidebarWidth, setSidebarWidth] = useState(260);
-  const isResizing = useRef(false);
-
-  const startResizing = useCallback((e: React.MouseEvent) => {
-    isResizing.current = true;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', stopResizing);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, []);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing.current) return;
-    const newWidth = Math.min(Math.max(220, e.clientX), 500);
-    setSidebarWidth(newWidth);
-  }, []);
-
-  const stopResizing = useCallback(() => {
-    isResizing.current = false;
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', stopResizing);
-    document.body.style.cursor = 'default';
-    document.body.style.userSelect = 'auto';
-    localStorage.setItem('nexus_sidebar_width', JSON.stringify(sidebarWidth));
-  }, [sidebarWidth]);
+  const [settings, setSettings] = useState<AppSettings>({
+    temperature: 0.7,
+    maxTokens: 2048,
+    useSearch: true,
+    useMemories: true,
+    thinkingBudget: 0,
+    accentColor: 'cyan'
+  });
 
   const sessionsControl = useHistory<ChatSession[]>([]);
   const sessions = sessionsControl.state;
@@ -69,22 +50,39 @@ function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const t = UI_TEXT[language];
 
+  // Apply theme color
   useEffect(() => {
-    const storedUser = localStorage.getItem('nexus_user_v2');
+    const root = document.documentElement;
+    const colors = {
+      cyan: '#06b6d4',
+      purple: '#d946ef',
+      emerald: '#10b981'
+    };
+    root.style.setProperty('--nexus-accent', colors[settings.accentColor]);
+  }, [settings.accentColor]);
+
+  // Load state from local storage
+  useEffect(() => {
+    const storedUser = localStorage.getItem('nexus_user_v3');
     const storedOpenAI = localStorage.getItem('nexus_openai_key');
     const storedAnthropic = localStorage.getItem('nexus_anthropic_key');
     const storedDeepSeek = localStorage.getItem('nexus_deepseek_key');
     const storedGrok = localStorage.getItem('nexus_grok_key');
-    const storedWidth = localStorage.getItem('nexus_sidebar_width');
-
+    const storedSettings = localStorage.getItem('nexus_app_settings');
+    
     if (storedOpenAI) setOpenaiKey(storedOpenAI);
     if (storedAnthropic) setAnthropicKey(storedAnthropic);
     if (storedDeepSeek) setDeepseekKey(storedDeepSeek);
     if (storedGrok) setGrokKey(storedGrok);
-    if (storedWidth) setSidebarWidth(JSON.parse(storedWidth));
+    if (storedSettings) {
+      try { 
+        const parsed = JSON.parse(storedSettings);
+        setSettings(prev => ({ ...prev, ...parsed })); 
+      } catch(e) {}
+    }
     
-    if (storedUser) { 
-      try { setUser(JSON.parse(storedUser)); } catch (e) { console.error(e); } 
+    if (storedUser) {
+      try { setUser(JSON.parse(storedUser)); } catch (e) {}
     }
     
     const storedPinned = localStorage.getItem('nexus_pinned');
@@ -94,38 +92,30 @@ function App() {
     if (storedMemories) { try { setGlobalMemories(JSON.parse(storedMemories)); } catch(e) {} }
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      const stored = localStorage.getItem(`nexus_sessions_global_${user.id}`);
-      if (stored) {
-        try {
-          const s = JSON.parse(stored);
-          setSessions(s, true);
-          if (s.length > 0 && !currentSessionId) setCurrentSessionId(s[0].id);
-        } catch (e) {}
-      }
-    }
-  }, [user]);
-
-  const handleUpdateApiKeys = (keys: { google?: string, openai?: string, anthropic?: string, deepseek?: string, grok?: string }) => {
+  const handleUpdateApiKeys = (keys: { openai?: string, anthropic?: string, deepseek?: string, grok?: string }) => {
     if (keys.openai !== undefined) { setOpenaiKey(keys.openai); localStorage.setItem('nexus_openai_key', keys.openai); }
     if (keys.anthropic !== undefined) { setAnthropicKey(keys.anthropic); localStorage.setItem('nexus_anthropic_key', keys.anthropic); }
     if (keys.deepseek !== undefined) { setDeepseekKey(keys.deepseek); localStorage.setItem('nexus_deepseek_key', keys.deepseek); }
     if (keys.grok !== undefined) { setGrokKey(keys.grok); localStorage.setItem('nexus_grok_key', keys.grok); }
   };
 
-  const handleAuthSuccess = (ic: string, n: string, k: any, a?: string) => {
+  const handleUpdateSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    localStorage.setItem('nexus_app_settings', JSON.stringify(newSettings));
+  };
+
+  const handleAuthSuccess = (inviteCode: string, name: string, keys: any, avatar?: string) => {
     const u: User = { 
-      id: btoa(ic + n), 
-      name: n, 
-      email: ic, 
-      avatar: a,
-      isAdmin: ic === 'NEXUS-0001', 
-      inviteCode: ic
+      id: btoa(inviteCode + name), 
+      name, 
+      email: inviteCode, 
+      avatar,
+      isAdmin: inviteCode === 'NEXUS-0001', 
+      inviteCode 
     };
     setUser(u);
-    handleUpdateApiKeys(k);
-    localStorage.setItem('nexus_user_v2', JSON.stringify(u));
+    handleUpdateApiKeys(keys);
+    localStorage.setItem('nexus_user_v3', JSON.stringify(u));
   };
 
   const addMemory = (content: string) => {
@@ -163,15 +153,11 @@ function App() {
     target.updatedAt = Date.now();
     updated = [target, ...updated.filter(s => s.id !== targetId)];
     setSessions(updated);
-    localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(updated));
 
     if (selectedModel.provider !== 'google' && (!providerKey || providerKey.trim() === "")) {
       target.messages.push({ 
-        id: uuidv4(), 
-        role: Role.MODEL, 
-        text: `Error: No API key provided for ${selectedModel.provider.toUpperCase()}. Please configure it in Settings.`, 
-        isError: true, 
-        timestamp: Date.now() 
+        id: uuidv4(), role: Role.MODEL, text: `Configuration Missing: No API key for ${selectedModel.provider.toUpperCase()}.`, 
+        isError: true, timestamp: Date.now() 
       });
       setSessions([...updated]);
       return;
@@ -185,7 +171,17 @@ function App() {
       setSessions([...updated]);
       
       const persona = PERSONAS.find(p => p.id === currentPersonaId)?.instruction || "";
-      const sys = (language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN) + "\n" + persona;
+      
+      // Memory Integration
+      let memoryInjection = "";
+      if (settings.useMemories && globalMemories.length > 0) {
+        const activeMemories = globalMemories.filter(m => m.enabled).map(m => m.content).join("\n");
+        if (activeMemories) {
+          memoryInjection = `\n\nCORE MEMORIES FOR RECALL:\n${activeMemories}\nUse these memories to personalize your response if relevant.`;
+        }
+      }
+
+      const sys = (language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN) + persona + memoryInjection;
       
       const res = await streamGeminiResponse(
         selectedModel, target.messages.slice(0, -1), text, sys, 
@@ -197,17 +193,28 @@ function App() {
             if (m) m.text = txt;
             return n;
           }, true);
-        }, providerKey
+        }, providerKey,
+        { 
+          useSearch: settings.useSearch, 
+          thinkingBudget: settings.thinkingBudget,
+          temperature: settings.temperature,
+          maxOutputTokens: settings.maxTokens
+        }
       );
       
       const final = target.messages.find(m => m.id === mid);
-      if (final) { final.text = res.text; final.groundingMetadata = res.groundingMetadata; }
+      if (final) {
+        final.text = res.text;
+        final.groundingMetadata = res.groundingMetadata;
+      }
       localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(updated));
     } catch (e: any) {
-      target.messages.push({ id: uuidv4(), role: Role.MODEL, text: `Operational Error: ${e.message}`, isError: true, timestamp: Date.now() });
+      target.messages.push({ id: uuidv4(), role: Role.MODEL, text: `Neural Link Error: ${e.message}`, isError: true, timestamp: Date.now() });
       setSessions([...updated]);
-    } finally { setIsLoading(false); }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, anthropicKey, deepseekKey, grokKey, language, currentPersonaId]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, anthropicKey, deepseekKey, grokKey, language, currentPersonaId, settings, globalMemories]);
 
   if (!user) return <AuthScreen onAuthSuccess={handleAuthSuccess} language={language} />;
 
@@ -216,54 +223,43 @@ function App() {
   return (
     <div className="flex h-screen mothership-bg text-slate-300 font-sans overflow-hidden">
       
-      {/* Mobile Sidebar Overlay */}
-      {isMobileSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setIsMobileSidebarOpen(false)}
-        />
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 lg:hidden transition-opacity" onClick={() => setSidebarOpen(false)} />
       )}
 
       <Sidebar 
-        isOpen={isMobileSidebarOpen} sessions={sessions} currentSessionId={currentSessionId} 
-        onNewChat={() => { setCurrentSessionId(null); setIsMobileSidebarOpen(false); }}
-        onSelectSession={(id) => { setCurrentSessionId(id); setIsMobileSidebarOpen(false); }}
+        isOpen={sidebarOpen} sessions={sessions} currentSessionId={currentSessionId} 
+        onNewChat={() => { setCurrentSessionId(null); setSidebarOpen(false); }}
+        onSelectSession={(id) => { setCurrentSessionId(id); setSidebarOpen(false); }}
         onDeleteSession={(id, e) => { e.stopPropagation(); setSessions(sessions.filter(s => s.id !== id)); }} 
-        user={user} onLogout={() => { localStorage.removeItem('nexus_user_v2'); setUser(null); }} language={language}
+        user={user} onLogout={() => { localStorage.removeItem('nexus_user_v3'); setUser(null); }} language={language}
         onToggleLanguage={() => setLanguage(language === 'en' ? 'zh' : 'en')} 
         currentPersonaId={currentPersonaId} onUpdatePersona={setCurrentPersonaId}
         apiKeys={{ google: "", openai: openaiKey, anthropic: anthropicKey, deepseek: deepseekKey, grok: grokKey }}
         onUpdateApiKeys={handleUpdateApiKeys}
-        width={sidebarWidth}
+        appSettings={settings}
+        onUpdateSettings={handleUpdateSettings}
+        globalMemories={globalMemories}
+        onAddMemory={addMemory}
+        onDeleteMemory={(id) => setGlobalMemories(prev => prev.filter(m => m.id !== id))}
       />
 
-      {/* Resize Handle - Hidden on Mobile */}
-      <div 
-        onMouseDown={startResizing}
-        className="hidden lg:flex w-1 h-full cursor-col-resize hover:bg-nexus-accent/40 active:bg-nexus-accent/60 transition-colors z-50 items-center justify-center group"
-      >
-        <div className="w-[1px] h-16 bg-white/5 group-hover:bg-nexus-accent/50 transition-colors"></div>
-      </div>
-
       <div className={`flex-1 flex flex-col relative transition-all duration-300 ${labOpen ? 'xl:mr-80' : 'mr-0'}`}>
-        <header className="h-14 flex items-center justify-between px-4 sm:px-6 z-20 border-b border-white/5 bg-nexus-900/60 backdrop-blur-xl">
+        <header className="h-14 flex items-center justify-between px-4 sm:px-6 z-20 border-b border-white/5 bg-nexus-900/40 backdrop-blur-xl">
           <div className="flex items-center gap-2 sm:gap-4">
-             <button 
-               onClick={() => setIsMobileSidebarOpen(true)}
-               className="lg:hidden p-2 text-gray-500 hover:text-white transition-colors"
-             >
+             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-gray-500 hover:text-white transition-colors">
                <MenuIcon />
              </button>
              <div className="flex items-center gap-2">
                <div className="w-1.5 h-1.5 rounded-full bg-nexus-accent shadow-glow animate-pulse"></div>
-               <span className="text-[10px] font-black font-mono text-nexus-accent uppercase tracking-widest hidden sm:inline">Uplink_Online</span>
+               <span className="text-[10px] font-black font-mono text-nexus-accent uppercase tracking-widest hidden sm:inline">Uplink_Secure</span>
              </div>
              
-             <div className="flex items-center gap-2 px-2 py-0.5 bg-white/5 border border-white/5 rounded-full overflow-hidden max-w-[120px] sm:max-w-none">
+             <div className="flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/5 rounded-full">
                 <select 
                   value={selectedModel.id}
                   onChange={(e) => setSelectedModel(GEMINI_MODELS.find(m => m.id === e.target.value) || GEMINI_MODELS[2])}
-                  className="bg-transparent text-[9px] sm:text-[10px] font-bold text-gray-400 outline-none cursor-pointer uppercase tracking-tighter w-full"
+                  className="bg-transparent text-[10px] font-bold text-gray-400 outline-none cursor-pointer uppercase tracking-tighter"
                 >
                   {GEMINI_MODELS.map(m => (
                     <option key={m.id} value={m.id} className="bg-nexus-900">{m.name}</option>
@@ -275,7 +271,7 @@ function App() {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setLabOpen(!labOpen)} 
-              className={`p-2 rounded-xl transition-all ${labOpen ? 'text-nexus-accent bg-nexus-accent/10' : 'text-gray-500 hover:text-white'}`}
+              className={`p-2 rounded-xl transition-all ${labOpen ? 'text-nexus-accent bg-nexus-accent/10 border border-nexus-accent/20' : 'text-gray-500 hover:text-white border border-transparent'}`}
             >
               <LabIcon />
             </button>
@@ -285,15 +281,16 @@ function App() {
         <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 custom-scrollbar">
           <div className="max-w-3xl mx-auto min-h-full flex flex-col">
             {currentMessages.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center py-20 opacity-20 select-none text-center">
-                <div className="w-12 h-12 glass-panel rounded-2xl flex items-center justify-center mb-6 border-white/10">
+              <div className="flex-1 flex flex-col items-center justify-center py-20 opacity-40 select-none text-center animate-in fade-in zoom-in-95 duration-700">
+                <div className="w-20 h-20 glass-panel rounded-[2rem] flex items-center justify-center mb-8 border-white/10 shadow-2xl relative">
+                  <div className="absolute inset-0 bg-nexus-accent/10 rounded-[2rem] animate-pulse"></div>
                   <BrainIcon />
                 </div>
-                <h1 className="text-xl font-black italic text-white uppercase tracking-tighter">Nexus Mothership</h1>
-                <p className="text-[9px] text-gray-600 font-mono tracking-[0.4em] mt-2 uppercase">Protocol_Bridge_Active</p>
+                <h1 className="text-3xl font-black italic text-white uppercase tracking-tighter">Nexus Mothership</h1>
+                <p className="text-[10px] text-gray-600 font-mono tracking-[0.6em] mt-3 uppercase">Neural_Network_Online</p>
               </div>
             ) : (
-              <div className="space-y-6 pb-28">
+              <div className="space-y-6 pb-24">
                 {currentMessages.map((msg) => (
                   <MessageBubble key={msg.id} message={msg} apiContext={{ 
                     apiKey: (selectedModel.provider === 'openai' ? openaiKey : (selectedModel.provider === 'anthropic' ? anthropicKey : (selectedModel.provider === 'deepseek' ? deepseekKey : (selectedModel.provider === 'grok' ? grokKey : "")))), 
@@ -307,20 +304,20 @@ function App() {
         </div>
 
         <div className="px-4 sm:px-8 py-6 absolute bottom-0 left-0 right-0 pointer-events-none">
-          <div className="max-w-3xl mx-auto glass-panel p-2 rounded-[2rem] pointer-events-auto border-white/10 shadow-2xl backdrop-blur-3xl ring-1 ring-white/5">
-            <div className="flex items-end gap-2 px-2 py-1">
+          <div className="max-w-3xl mx-auto glass-panel p-2 rounded-[2.5rem] pointer-events-auto border-white/10 shadow-2xl backdrop-blur-3xl ring-1 ring-white/10">
+            <div className="flex items-end gap-2 px-3 py-1">
                <textarea 
                 rows={1}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                 placeholder={t.placeholder}
-                className="flex-1 bg-transparent text-white px-3 py-3 focus:outline-none resize-none text-sm placeholder-gray-800 min-h-[44px] max-h-48 custom-scrollbar"
+                className="flex-1 bg-transparent text-white px-3 py-3.5 focus:outline-none resize-none text-sm font-medium placeholder-gray-800 max-h-60 custom-scrollbar"
                />
                <button 
                  onClick={handleSendMessage} 
                  disabled={isLoading || !inputValue.trim()} 
-                 className={`p-3 rounded-2xl transition-all shadow-lg active:scale-90 ${inputValue.trim() && !isLoading ? 'bg-nexus-accent text-black font-bold' : 'bg-white/5 text-gray-700 opacity-20'}`}
+                 className={`p-4 rounded-[1.5rem] transition-all shadow-xl active:scale-90 ${inputValue.trim() && !isLoading ? 'bg-nexus-accent text-black font-black' : 'bg-white/5 text-gray-700 opacity-20'}`}
                >
                  {isLoading ? <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin"></div> : <SendIcon />}
                </button>
@@ -330,29 +327,47 @@ function App() {
       </div>
 
       <aside className={`fixed inset-y-0 right-0 z-40 w-full sm:w-80 glass-panel border-l transform transition-all duration-500 ease-in-out ${labOpen ? 'translate-x-0' : 'translate-x-full'} bg-nexus-950/95 backdrop-blur-3xl shadow-2xl flex flex-col`}>
-        <div className="p-5 border-b border-white/5 flex items-center justify-between">
+        <div className="p-5 border-b border-white/5 flex items-center justify-between bg-white/2">
           <div className="text-[10px] font-black tracking-widest text-white uppercase flex items-center gap-2">
              <LabIcon /> ANALYTICS_LAB
           </div>
           <button onClick={() => setLabOpen(false)} className="text-gray-500 hover:text-white p-2 transition-colors">✕</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
            <section>
-              <h3 className="text-[10px] font-black text-gray-600 uppercase mb-3 flex items-center gap-2 tracking-widest"><MemoryIcon /> Neural Memory</h3>
-              <input 
-                type="text" 
-                placeholder="Log fact..."
-                className="w-full bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-nexus-accent/30 transition-all placeholder-gray-800 mb-4"
-                onKeyDown={(e) => { if (e.key === 'Enter') { addMemory((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; } }}
-              />
-              <div className="space-y-2">
-                 {globalMemories.map(mem => (
-                   <div key={mem.id} className="p-3 prism-card rounded-xl flex items-center justify-between group/mem animate-in fade-in slide-in-from-right-2 border-white/5">
-                      <p className="text-xs text-gray-400 flex-1">{mem.content}</p>
-                      <button onClick={() => setGlobalMemories(p => p.filter(m => m.id !== mem.id))} className="opacity-0 group-hover/mem:opacity-100 text-red-500/50 hover:text-red-500 ml-2">✕</button>
-                   </div>
-                 ))}
+              <h3 className="text-[10px] font-black text-gray-600 uppercase mb-4 flex items-center gap-2 tracking-widest"><MemoryIcon /> Neural Memory</h3>
+              <div className="space-y-4">
+                 <input 
+                  type="text" 
+                  placeholder="Record neural fact..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-xs text-white focus:outline-none focus:border-nexus-accent/30 transition-all placeholder-gray-800 shadow-inner"
+                  onKeyDown={(e) => { if (e.key === 'Enter') { addMemory((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; } }}
+                 />
+                 <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                   {globalMemories.map(mem => (
+                     <div key={mem.id} className="p-4 prism-card rounded-2xl flex items-center justify-between group/mem animate-in fade-in slide-in-from-right-4 border-white/5">
+                        <p className="text-xs text-gray-400 leading-relaxed flex-1">{mem.content}</p>
+                        <button onClick={() => setGlobalMemories(p => p.filter(m => m.id !== mem.id))} className="opacity-0 group-hover/mem:opacity-100 text-red-500/50 hover:text-red-400 transition-all ml-4">✕</button>
+                     </div>
+                   ))}
+                 </div>
+              </div>
+           </section>
+
+           <div className="h-px bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+
+           <section>
+              <h3 className="text-[10px] font-black text-gray-600 uppercase mb-4 flex items-center gap-2 tracking-widest"><PinIcon /> Pinned Logs</h3>
+              <div className="space-y-3">
+                {pinnedItems.length === 0 ? (
+                  <div className="text-center py-10 border border-dashed border-white/5 rounded-3xl text-[10px] text-gray-700 italic uppercase tracking-tighter">No high-priority logs</div>
+                ) : pinnedItems.map((item) => (
+                  <div key={item.id} className="p-4 prism-card rounded-2xl relative group overflow-hidden border-white/5">
+                      <button onClick={() => setPinnedItems(p => p.filter(i => i.id !== item.id))} className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all">✕</button>
+                      <div className="text-[11px] text-gray-500 line-clamp-6 leading-relaxed font-mono">{item.text}</div>
+                  </div>
+                ))}
               </div>
            </section>
         </div>

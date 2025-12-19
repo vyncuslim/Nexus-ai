@@ -22,7 +22,9 @@ const getHeaders = (apiKey: string, provider: AIProvider) => {
 
 interface GenerationOptions {
   useSearch?: boolean;
-  useThinking?: boolean;
+  thinkingBudget?: number;
+  maxOutputTokens?: number;
+  temperature?: number;
 }
 
 interface StreamResult {
@@ -54,11 +56,11 @@ export const streamGeminiResponse = async (
     if (model.provider === 'deepseek') url = DEEPSEEK_API_URL;
     if (model.provider === 'grok') url = GROK_API_URL;
     
-    const text = await streamOpenAICompatibleResponse(url, model.id, history, newMessage, systemInstruction, onChunk, apiKey);
+    const text = await streamOpenAICompatibleResponse(url, model.id, history, newMessage, systemInstruction, onChunk, apiKey, options);
     return { text };
   } 
   else if (model.provider === 'anthropic') {
-    const text = await streamAnthropicResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey);
+    const text = await streamAnthropicResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey, options);
     return { text };
   } 
   else {
@@ -76,7 +78,8 @@ const streamOpenAICompatibleResponse = async (
   newMessage: string,
   systemInstruction: string,
   onChunk: (text: string) => void,
-  apiKey: string
+  apiKey: string,
+  options: GenerationOptions
 ): Promise<string> => {
   const messages = [
     { role: "system", content: systemInstruction },
@@ -93,7 +96,9 @@ const streamOpenAICompatibleResponse = async (
     body: JSON.stringify({
       model: modelId,
       messages: messages,
-      stream: true
+      stream: true,
+      temperature: options.temperature,
+      max_tokens: options.maxOutputTokens
     })
   });
 
@@ -145,7 +150,8 @@ const streamAnthropicResponse = async (
   newMessage: string,
   systemInstruction: string,
   onChunk: (text: string) => void,
-  apiKey: string
+  apiKey: string,
+  options: GenerationOptions
 ): Promise<string> => {
   const messages = [
     ...history.map(m => ({ role: m.role === Role.USER ? "user" : "assistant", content: m.text })),
@@ -165,7 +171,8 @@ const streamAnthropicResponse = async (
       messages: messages,
       system: systemInstruction,
       stream: true,
-      max_tokens: 4096
+      max_tokens: options.maxOutputTokens || 4096,
+      temperature: options.temperature
     })
   });
 
@@ -228,7 +235,15 @@ const streamGoogleResponse = async (
 
   const config: any = { 
     systemInstruction,
+    temperature: options.temperature,
+    maxOutputTokens: options.maxOutputTokens,
   };
+
+  if (options.thinkingBudget && options.thinkingBudget > 0) {
+    config.thinkingConfig = { thinkingBudget: options.thinkingBudget };
+    // Ensure maxOutputTokens is set and larger than thinking budget if needed
+    if (!config.maxOutputTokens) config.maxOutputTokens = options.thinkingBudget + 2048;
+  }
 
   if (options.useSearch) {
     config.tools = [{ googleSearch: {} }];
@@ -246,7 +261,6 @@ const streamGoogleResponse = async (
   let groundingMetadata: GroundingMetadata | undefined;
 
   for await (const chunk of result) {
-    // Access .text property directly as per guidelines
     const text = chunk.text;
     if (text) {
       fullText += text;
@@ -263,7 +277,6 @@ const streamGoogleResponse = async (
 };
 
 export const generateSpeech = async (text: string, apiKey?: string, provider: AIProvider = 'google'): Promise<string> => {
-  // Initialize GoogleGenAI exclusively with process.env.API_KEY
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
@@ -274,7 +287,6 @@ export const generateSpeech = async (text: string, apiKey?: string, provider: AI
     },
   });
   
-  // Access result from GenerateContentResponse
   const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
   if (!audioData) throw new Error("Voice synthesis failure");
   return audioData;
