@@ -4,10 +4,10 @@ import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
 import AuthScreen from './components/AuthScreen';
 import { 
-  SendIcon, BrainIcon, PinIcon, LabIcon, MemoryIcon, MenuIcon, AgentIcon, ActivityIcon
+  SendIcon, BrainIcon, LabIcon, MemoryIcon, MenuIcon, AgentIcon, ActivityIcon, LinkIcon, TrashIcon
 } from './components/Icon';
-import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, AGENT_INSTRUCTION, UI_TEXT, PERSONAS } from './constants';
-import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, GlobalMemory, AppSettings } from './types';
+import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, AGENT_INSTRUCTION, UI_TEXT, PERSONAS, DATABASE_TOOLS } from './constants';
+import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, GlobalMemory, AppSettings, DatabaseRecord } from './types';
 import { streamGeminiResponse } from './services/geminiService';
 import { useHistory } from './hooks/useHistory';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,15 +15,15 @@ import { v4 as uuidv4 } from 'uuid';
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [openaiKey, setOpenaiKey] = useState<string>('');
-  const [anthropicKey, setAnthropicKey] = useState<string>('');
   const [deepseekKey, setDeepseekKey] = useState<string>('');
   const [grokKey, setGrokKey] = useState<string>('');
   
   const [language, setLanguage] = useState<Language>('en');
   const [labOpen, setLabOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [pinnedItems, setPinnedItems] = useState<ChatMessage[]>([]);
   const [globalMemories, setGlobalMemories] = useState<GlobalMemory[]>([]);
+  const [database, setDatabase] = useState<DatabaseRecord[]>([]);
+  const [isDbAccessing, setIsDbAccessing] = useState(false);
   
   const [currentPersonaId, setCurrentPersonaId] = useState<string>('default');
   const [settings, setSettings] = useState<AppSettings>({
@@ -31,7 +31,7 @@ function App() {
     maxTokens: 2048,
     useSearch: true,
     useMemories: true,
-    isAgentMode: false,
+    isAgentMode: true,
     agentType: 'general',
     thinkingBudget: 0,
     accentColor: 'cyan'
@@ -61,36 +61,19 @@ function App() {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('nexus_user_v3');
-    const storedOpenAI = localStorage.getItem('nexus_openai_key');
-    const storedDeepSeek = localStorage.getItem('nexus_deepseek_key');
-    const storedGrok = localStorage.getItem('nexus_grok_key');
     const storedSettings = localStorage.getItem('nexus_app_settings');
     const storedMemories = localStorage.getItem('nexus_memories');
+    const storedDb = localStorage.getItem('nexus_database');
     
-    if (storedOpenAI) setOpenaiKey(storedOpenAI);
-    if (storedDeepSeek) setDeepseekKey(storedDeepSeek);
-    if (storedGrok) setGrokKey(storedGrok);
     if (storedSettings) { try { setSettings(prev => ({ ...prev, ...JSON.parse(storedSettings) })); } catch(e) {} }
     if (storedUser) { try { setUser(JSON.parse(storedUser)); } catch (e) {} }
     if (storedMemories) { try { setGlobalMemories(JSON.parse(storedMemories)); } catch(e) {} }
+    if (storedDb) { try { setDatabase(JSON.parse(storedDb)); } catch(e) {} }
   }, []);
-
-  const handleUpdateApiKeys = (keys: any) => {
-    if (keys.openai !== undefined) { setOpenaiKey(keys.openai); localStorage.setItem('nexus_openai_key', keys.openai); }
-    if (keys.deepseek !== undefined) { setDeepseekKey(keys.deepseek); localStorage.setItem('nexus_deepseek_key', keys.deepseek); }
-    if (keys.grok !== undefined) { setGrokKey(keys.grok); localStorage.setItem('nexus_grok_key', keys.grok); }
-  };
 
   const handleUpdateSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
     localStorage.setItem('nexus_app_settings', JSON.stringify(newSettings));
-  };
-
-  const addMemory = (content: string) => {
-    if (!content.trim()) return;
-    const updated = [{ id: uuidv4(), content, enabled: true, timestamp: Date.now() }, ...globalMemories];
-    setGlobalMemories(updated);
-    localStorage.setItem('nexus_memories', JSON.stringify(updated));
   };
 
   const handleSendMessage = useCallback(async () => {
@@ -114,54 +97,96 @@ function App() {
     setInputValue("");
     target.messages.push({ id: uuidv4(), role: Role.USER, text, timestamp: Date.now() });
     target.updatedAt = Date.now();
-    updated = [target, ...updated.filter(s => s.id !== targetId)];
-    setSessions(updated);
-
-    if (selectedModel.provider !== 'google' && !providerKey) {
-       target.messages.push({ id: uuidv4(), role: Role.MODEL, text: `API Link Missing: ${selectedModel.provider.toUpperCase()}`, isError: true, timestamp: Date.now() });
-       setSessions([...updated]);
-       return;
-    }
+    setSessions([target, ...updated.filter(s => s.id !== targetId)]);
 
     setIsLoading(true);
+
     try {
-      const mid = uuidv4();
-      target.messages.push({ id: mid, role: Role.MODEL, text: "", timestamp: Date.now() });
-      setSessions([...updated]);
-      
-      let memoryInjection = "";
-      if (settings.useMemories && globalMemories.length > 0) {
-        memoryInjection = `\n\n[PERSISTENT MEMORY]\n${globalMemories.filter(m => m.enabled).map(m => `- ${m.content}`).join('\n')}`;
-      }
+      const executeChatLoop = async (userMsg: string, isToolResponse = false) => {
+        const mid = uuidv4();
+        target!.messages.push({ id: mid, role: Role.MODEL, text: "", timestamp: Date.now() });
+        setSessions(prev => [...prev]);
 
-      const agentInjection = settings.isAgentMode ? `\n\n[AGENT SUB-PROTOCOL: ${settings.agentType.toUpperCase()}]\n${AGENT_INSTRUCTION}` : "";
-      const sys = (language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN) + memoryInjection + agentInjection;
-      const budget = (settings.isAgentMode && settings.thinkingBudget === 0) ? 8192 : settings.thinkingBudget;
+        let memoryInjection = "";
+        if (settings.useMemories && globalMemories.length > 0) {
+          memoryInjection = `\n\n[MEM_CORE]\n${globalMemories.filter(m => m.enabled).map(m => `- ${m.content}`).join('\n')}`;
+        }
+        const agentInjection = settings.isAgentMode ? `\n\n[PROTOCOL: ${settings.agentType.toUpperCase()}]\n${AGENT_INSTRUCTION}` : "";
+        const sys = (language === 'zh' ? SYSTEM_INSTRUCTION_ZH : SYSTEM_INSTRUCTION_EN) + memoryInjection + agentInjection;
+        
+        const res = await streamGeminiResponse(
+          selectedModel, 
+          target!.messages.slice(0, -1), 
+          userMsg, sys, 
+          (txt) => {
+            setSessions(p => {
+              const n = [...p];
+              const s = n.find(sess => sess.id === targetId);
+              const m = s?.messages.find(msg => msg.id === mid);
+              if (m) m.text = txt;
+              return n;
+            }, true);
+          }, 
+          providerKey, 
+          { 
+            useSearch: settings.useSearch, 
+            tools: settings.isAgentMode ? DATABASE_TOOLS : undefined,
+            thinkingBudget: settings.isAgentMode ? 8192 : settings.thinkingBudget,
+            temperature: settings.temperature 
+          }
+        );
 
-      const res = await streamGeminiResponse(selectedModel, target.messages.slice(0, -1), text, sys, (txt) => {
-        setSessions(p => {
-          const n = [...p];
-          const s = n.find(sess => sess.id === targetId);
-          const m = s?.messages.find(msg => msg.id === mid);
-          if (m) m.text = txt;
-          return n;
-        }, true);
-      }, providerKey, { useSearch: settings.useSearch, thinkingBudget: budget, temperature: settings.temperature, maxOutputTokens: settings.maxTokens });
-      
-      const finalMsg = target.messages.find(m => m.id === mid);
-      if (finalMsg) { finalMsg.text = res.text; finalMsg.groundingMetadata = res.groundingMetadata; }
-      localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(updated));
+        if (res.functionCalls && res.functionCalls.length > 0) {
+          setIsDbAccessing(true);
+          const toolResults = [];
+          for (const call of res.functionCalls) {
+            let result = "error: unknown tool";
+            if (call.name === 'query_database') {
+              const filter = (call.args.filter || '').toLowerCase();
+              const found = database.filter(r => r.content.toLowerCase().includes(filter));
+              result = found.length > 0 ? JSON.stringify(found) : "No records found.";
+            } else if (call.name === 'update_database') {
+              const { action, content, id } = call.args;
+              if (action === 'add' && content) {
+                const newRec = { id: uuidv4().slice(0, 8), content, timestamp: Date.now() };
+                const newDb = [newRec, ...database];
+                setDatabase(newDb);
+                localStorage.setItem('nexus_database', JSON.stringify(newDb));
+                result = `Successfully added: ${content} (ID: ${newRec.id})`;
+              } else if (action === 'remove' && id) {
+                const newDb = database.filter(r => r.id !== id);
+                setDatabase(newDb);
+                localStorage.setItem('nexus_database', JSON.stringify(newDb));
+                result = `Successfully removed record ${id}`;
+              } else if (action === 'clear') {
+                setDatabase([]);
+                localStorage.setItem('nexus_database', "[]");
+                result = "Database cleared.";
+              }
+            }
+            toolResults.push({ name: call.name, result });
+          }
+          setIsDbAccessing(false);
+          // 自动反馈给 AI
+          await executeChatLoop(`TOOL_RESPONSE: ${JSON.stringify(toolResults)}`, true);
+        } else {
+          const finalMsg = target!.messages.find(m => m.id === mid);
+          if (finalMsg) { finalMsg.text = res.text; finalMsg.groundingMetadata = res.groundingMetadata; }
+        }
+      };
+
+      await executeChatLoop(text);
+      localStorage.setItem(`nexus_sessions_global_${user.id}`, JSON.stringify(sessions));
     } catch (e: any) {
       target.messages.push({ id: uuidv4(), role: Role.MODEL, text: `Uplink Error: ${e.message}`, isError: true, timestamp: Date.now() });
-      setSessions([...updated]);
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, deepseekKey, grokKey, language, settings, globalMemories]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, deepseekKey, grokKey, language, settings, globalMemories, database]);
 
-  if (!user) return <AuthScreen onAuthSuccess={(inviteCode, name, keys, avatar) => {
-    const u = { id: btoa(inviteCode + name), name, email: inviteCode, avatar };
-    setUser(u); handleUpdateApiKeys(keys); localStorage.setItem('nexus_user_v3', JSON.stringify(u));
+  if (!user) return <AuthScreen onAuthSuccess={(inviteCode, name, keys) => {
+    const u = { id: btoa(inviteCode + name), name, email: inviteCode };
+    setUser(u); localStorage.setItem('nexus_user_v3', JSON.stringify(u));
   }} language={language} />;
 
   const currentMessages = sessions.find(s => s.id === currentSessionId)?.messages || [];
@@ -169,7 +194,7 @@ function App() {
   return (
     <div className="flex h-screen mothership-bg text-slate-300 font-sans overflow-hidden">
       {sidebarOpen && <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <Sidebar isOpen={sidebarOpen} sessions={sessions} currentSessionId={currentSessionId} onNewChat={() => { setCurrentSessionId(null); setSidebarOpen(false); }} onSelectSession={setCurrentSessionId} onDeleteSession={(id) => setSessions(sessions.filter(s => s.id !== id))} user={user} onLogout={() => setUser(null)} language={language} onToggleLanguage={() => setLanguage(language === 'en' ? 'zh' : 'en')} currentPersonaId={currentPersonaId} onUpdatePersona={setCurrentPersonaId} apiKeys={{ google: "", openai: openaiKey, anthropic: "", deepseek: deepseekKey, grok: grokKey }} onUpdateApiKeys={handleUpdateApiKeys} appSettings={settings} onUpdateSettings={handleUpdateSettings} globalMemories={globalMemories} onAddMemory={addMemory} onDeleteMemory={(id) => setGlobalMemories(globalMemories.filter(m => m.id !== id))} />
+      <Sidebar isOpen={sidebarOpen} sessions={sessions} currentSessionId={currentSessionId} onNewChat={() => { setCurrentSessionId(null); setSidebarOpen(false); }} onSelectSession={setCurrentSessionId} onDeleteSession={(id) => setSessions(sessions.filter(s => s.id !== id))} user={user} onLogout={() => setUser(null)} language={language} onToggleLanguage={() => setLanguage(language === 'en' ? 'zh' : 'en')} currentPersonaId={currentPersonaId} onUpdatePersona={setCurrentPersonaId} apiKeys={{ google: "", openai: openaiKey, anthropic: "", deepseek: deepseekKey, grok: grokKey }} onUpdateApiKeys={() => {}} appSettings={settings} onUpdateSettings={handleUpdateSettings} globalMemories={globalMemories} onAddMemory={(c) => setGlobalMemories([{id:uuidv4(),content:c,enabled:true,timestamp:Date.now()}, ...globalMemories])} onDeleteMemory={(id) => setGlobalMemories(globalMemories.filter(m => m.id !== id))} />
 
       <div className={`flex-1 flex flex-col relative transition-all duration-300 ${labOpen ? 'xl:mr-80' : 'mr-0'}`}>
         <header className="h-16 flex items-center justify-between px-6 z-20 border-b border-white/5 bg-nexus-900/40 backdrop-blur-xl">
@@ -177,12 +202,11 @@ function App() {
              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-gray-500 hover:text-white"><MenuIcon /></button>
              <div className="flex flex-col">
                <div className="flex items-center gap-2">
-                 <div className={`w-1.5 h-1.5 rounded-full ${settings.isAgentMode ? 'bg-nexus-purple shadow-[0_0_10px_#d946ef]' : 'bg-nexus-accent shadow-glow'} animate-pulse`}></div>
-                 <span className={`text-[10px] font-black font-mono uppercase tracking-widest ${settings.isAgentMode ? 'text-nexus-purple' : 'text-nexus-accent'}`}>
-                    {settings.isAgentMode ? `AGENT_MATRIX [TYPE: ${settings.agentType}]` : 'Uplink_Secure'}
+                 <div className={`w-1.5 h-1.5 rounded-full ${isDbAccessing ? 'bg-amber-400 shadow-[0_0_10px_#fbbf24]' : settings.isAgentMode ? 'bg-nexus-purple shadow-[0_0_10px_#d946ef]' : 'bg-nexus-accent shadow-glow'} animate-pulse`}></div>
+                 <span className={`text-[10px] font-black font-mono uppercase tracking-widest ${isDbAccessing ? 'text-amber-400' : settings.isAgentMode ? 'text-nexus-purple' : 'text-nexus-accent'}`}>
+                    {isDbAccessing ? 'NEURAL_DB_ACCESSING' : settings.isAgentMode ? `AGENT_MATRIX [TYPE: ${settings.agentType}]` : 'Uplink_Secure'}
                  </span>
                </div>
-               {settings.isAgentMode && <span className="text-[7px] text-nexus-purple/40 font-mono tracking-[0.3em] uppercase ml-3.5">Autonomy_Level_High</span>}
              </div>
           </div>
           <div className="flex items-center gap-3">
@@ -203,12 +227,12 @@ function App() {
                   <div className={`absolute inset-0 ${settings.isAgentMode ? 'bg-nexus-purple/10' : 'bg-nexus-accent/10'} rounded-[2.5rem] animate-pulse`}></div>
                   {settings.isAgentMode ? <AgentIcon /> : <BrainIcon />}
                 </div>
-                <h1 className="text-4xl font-black italic text-white uppercase tracking-tighter">{settings.isAgentMode ? "Neural Agent Cluster" : "Nexus Mothership"}</h1>
-                <p className="text-[10px] text-gray-600 font-mono tracking-[0.5em] mt-4 uppercase italic">Standby_For_Command_Deploy</p>
+                <h1 className="text-4xl font-black italic text-white uppercase tracking-tighter">Nexus Agent Matrix</h1>
+                <p className="text-[10px] text-gray-600 font-mono tracking-[0.5em] mt-4 uppercase italic">Database_Link_Established</p>
               </div>
             ) : (
               <div className="space-y-8 pb-32">
-                {currentMessages.map((msg) => (<MessageBubble key={msg.id} message={msg} apiContext={{ apiKey: (selectedModel.provider === 'openai' ? openaiKey : (selectedModel.provider === 'deepseek' ? deepseekKey : grokKey)), provider: selectedModel.provider }} />))}
+                {currentMessages.filter(m => !m.text.startsWith('TOOL_RESPONSE')).map((msg) => (<MessageBubble key={msg.id} message={msg} apiContext={{ apiKey: process.env.API_KEY || "", provider: 'google' }} />))}
                 <div ref={messagesEndRef} />
               </div>
             )}
@@ -218,7 +242,7 @@ function App() {
         <div className="px-6 py-8 absolute bottom-0 left-0 right-0 pointer-events-none">
           <div className={`max-w-3xl mx-auto glass-panel p-2.5 rounded-[3rem] pointer-events-auto border-white/10 shadow-3xl backdrop-blur-3xl ring-1 transition-all duration-500 ${settings.isAgentMode ? 'ring-nexus-purple/40 border-nexus-purple/20' : 'ring-white/10'}`}>
             <div className="flex items-end gap-3 px-4 py-2">
-               <textarea rows={1} value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={settings.isAgentMode ? "Define objective for Neural Agent..." : t.placeholder} className="flex-1 bg-transparent text-white px-3 py-3.5 focus:outline-none resize-none text-sm font-medium placeholder-gray-800 max-h-60 custom-scrollbar" />
+               <textarea rows={1} value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={settings.isAgentMode ? "Command AI to query or update neural database..." : t.placeholder} className="flex-1 bg-transparent text-white px-3 py-3.5 focus:outline-none resize-none text-sm font-medium placeholder-gray-800 max-h-60 custom-scrollbar" />
                <button onClick={handleSendMessage} disabled={isLoading || !inputValue.trim()} className={`p-4.5 rounded-[2rem] transition-all shadow-2xl active:scale-95 ${inputValue.trim() && !isLoading ? (settings.isAgentMode ? 'bg-nexus-purple text-white' : 'bg-nexus-accent text-black font-black') : 'bg-white/5 text-gray-700 opacity-20'}`}>
                  {isLoading ? <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></div> : <SendIcon />}
                </button>
@@ -229,21 +253,27 @@ function App() {
 
       <aside className={`fixed inset-y-0 right-0 z-40 w-full sm:w-80 glass-panel border-l transform transition-all duration-500 ease-in-out ${labOpen ? 'translate-x-0' : 'translate-x-full'} bg-nexus-950/95 backdrop-blur-3xl shadow-2xl flex flex-col`}>
         <div className="p-6 border-b border-white/5 flex items-center justify-between">
-          <div className="text-[10px] font-black tracking-widest text-white uppercase flex items-center gap-2"><LabIcon /> ANALYTICS_CORE</div>
+          <div className="text-[10px] font-black tracking-widest text-white uppercase flex items-center gap-2"><LabIcon /> NEURAL_DATA_STORE</div>
           <button onClick={() => setLabOpen(false)} className="text-gray-500 hover:text-white p-2">✕</button>
         </div>
-        <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
            <section>
-              <h3 className="text-[10px] font-black text-gray-600 uppercase mb-6 flex items-center gap-2 tracking-widest"><ActivityIcon /> Matrix_Status</h3>
-              <div className="space-y-4">
-                 <div className="p-5 prism-card rounded-[2rem] border-white/5 bg-white/[0.02]">
-                    <div className="text-[9px] text-gray-500 uppercase mb-2 font-mono">Neural_Load</div>
-                    <div className="h-1 bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-nexus-accent w-1/3 animate-pulse"></div></div>
-                 </div>
-                 <div className="p-5 prism-card rounded-[2rem] border-white/5 bg-white/[0.02]">
-                    <div className="text-[9px] text-gray-500 uppercase mb-2 font-mono">Memory_Archive</div>
-                    <div className="text-xl font-black text-white">{globalMemories.length} <span className="text-[10px] font-mono text-gray-700">Patterns</span></div>
-                 </div>
+              <h3 className="text-[10px] font-black text-gray-600 uppercase mb-4 flex items-center gap-2 tracking-widest"><ActivityIcon /> LIVE_DATABASE</h3>
+              <div className="space-y-3">
+                 {database.length === 0 ? (
+                   <div className="text-center py-10 border border-dashed border-white/5 rounded-3xl text-gray-800 italic text-[10px] uppercase">Database_Empty</div>
+                 ) : (
+                   database.map(record => (
+                     <div key={record.id} className="p-4 prism-card rounded-2xl group border-white/5 relative overflow-hidden">
+                        <div className="flex justify-between items-start mb-2">
+                           <span className="text-[8px] font-mono text-nexus-accent tracking-tighter bg-nexus-accent/10 px-1.5 py-0.5 rounded-md">#{record.id}</span>
+                           <button onClick={() => setDatabase(database.filter(r => r.id !== record.id))} className="opacity-0 group-hover:opacity-100 text-red-500/50 hover:text-red-500 transition-all"><TrashIcon /></button>
+                        </div>
+                        <p className="text-xs text-gray-300 leading-relaxed font-medium uppercase tracking-tight">{record.content}</p>
+                        <div className="mt-2 text-[7px] text-gray-700 font-mono italic">{new Date(record.timestamp).toLocaleString()}</div>
+                     </div>
+                   ))
+                 )}
               </div>
            </section>
         </div>

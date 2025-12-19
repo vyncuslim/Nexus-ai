@@ -4,6 +4,16 @@ export enum Role {
   MODEL = 'model'
 }
 
+export enum Type {
+  STRING = 'STRING',
+  NUMBER = 'NUMBER',
+  INTEGER = 'INTEGER',
+  BOOLEAN = 'BOOLEAN',
+  ARRAY = 'ARRAY',
+  OBJECT = 'OBJECT',
+  NULL = 'NULL',
+}
+
 export enum Modality {
   AUDIO = 'AUDIO',
   TEXT = 'TEXT'
@@ -37,6 +47,7 @@ export interface ChatMessage {
   groundingMetadata?: GroundingMetadata;
   isError?: boolean;
   timestamp: number;
+  isFunctionCall?: boolean;
 }
 
 export type ModelCategory = 'text' | 'image' | 'video';
@@ -66,6 +77,12 @@ export interface GlobalMemory {
   timestamp: number;
 }
 
+export interface DatabaseRecord {
+  id: string;
+  content: string;
+  timestamp: number;
+}
+
 export type Language = 'en' | 'zh';
 
 export interface User {
@@ -73,9 +90,6 @@ export interface User {
   email: string;
   name: string;
   avatar?: string;
-  isGoogleLinked?: boolean;
-  isAdmin?: boolean;
-  inviteCode?: string;
 }
 
 export interface Persona {

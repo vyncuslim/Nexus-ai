@@ -1,40 +1,26 @@
 
 import { ChatMessage, Role, AIProvider, ModelConfig, GroundingMetadata } from "../types";
-import { GoogleGenAI, Modality } from "@google/genai";
-
-/**
- * Unified AI Service
- * Supports OpenAI, Google Gemini, Anthropic, DeepSeek, and Grok
- */
+import { GoogleGenAI, Modality, GenerateContentResponse } from "@google/genai";
+import { DATABASE_TOOLS } from "../constants";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
 const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-
-const getHeaders = (apiKey: string, provider: AIProvider) => {
-  const headers: any = {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${apiKey}`
-  };
-  return headers;
-};
 
 interface GenerationOptions {
   useSearch?: boolean;
   thinkingBudget?: number;
   maxOutputTokens?: number;
   temperature?: number;
+  tools?: any[];
 }
 
 interface StreamResult {
   text: string;
   groundingMetadata?: GroundingMetadata;
+  functionCalls?: any[];
 }
 
-/**
- * Stream Response (Unified)
- */
 export const streamGeminiResponse = async (
   model: ModelConfig,
   history: ChatMessage[],
@@ -44,33 +30,20 @@ export const streamGeminiResponse = async (
   apiKey?: string,
   options: GenerationOptions = {}
 ): Promise<StreamResult> => {
-  // Always use process.env.API_KEY for Google provider
   if (model.provider === 'google') {
     return streamGoogleResponse(model.id, history, newMessage, systemInstruction, onChunk, options);
   }
 
   if (!apiKey) throw new Error(`API Key missing for ${model.provider}`);
 
-  if (model.provider === 'openai' || model.provider === 'codex' || model.provider === 'deepseek' || model.provider === 'grok') {
-    let url = OPENAI_API_URL;
-    if (model.provider === 'deepseek') url = DEEPSEEK_API_URL;
-    if (model.provider === 'grok') url = GROK_API_URL;
+  let url = OPENAI_API_URL;
+  if (model.provider === 'deepseek') url = DEEPSEEK_API_URL;
+  if (model.provider === 'grok') url = GROK_API_URL;
     
-    const text = await streamOpenAICompatibleResponse(url, model.id, history, newMessage, systemInstruction, onChunk, apiKey, options);
-    return { text };
-  } 
-  else if (model.provider === 'anthropic') {
-    const text = await streamAnthropicResponse(model.id, history, newMessage, systemInstruction, onChunk, apiKey, options);
-    return { text };
-  } 
-  else {
-    throw new Error(`Unsupported provider: ${model.provider}`);
-  }
+  const text = await streamOpenAICompatibleResponse(url, model.id, history, newMessage, systemInstruction, onChunk, apiKey, options);
+  return { text };
 };
 
-/**
- * OpenAI-Compatible Implementation (OpenAI, DeepSeek, Grok)
- */
 const streamOpenAICompatibleResponse = async (
   url: string,
   modelId: string,
@@ -102,11 +75,7 @@ const streamOpenAICompatibleResponse = async (
     })
   });
 
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error?.message || "AI Provider API Error");
-  }
-
+  if (!response.ok) throw new Error("AI Provider API Error");
   if (!response.body) throw new Error("No response body");
 
   const reader = response.body.getReader();
@@ -117,12 +86,10 @@ const streamOpenAICompatibleResponse = async (
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    
     const chunk = decoder.decode(value, { stream: true });
     buffer += chunk;
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
-
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed === "data: [DONE]") break;
@@ -134,89 +101,13 @@ const streamOpenAICompatibleResponse = async (
             fullText += content;
             onChunk(fullText);
           }
-        } catch (e) { /* ignore */ }
+        } catch (e) {}
       }
     }
   }
   return fullText;
 };
 
-/**
- * Anthropic Implementation
- */
-const streamAnthropicResponse = async (
-  modelId: string,
-  history: ChatMessage[],
-  newMessage: string,
-  systemInstruction: string,
-  onChunk: (text: string) => void,
-  apiKey: string,
-  options: GenerationOptions
-): Promise<string> => {
-  const messages = [
-    ...history.map(m => ({ role: m.role === Role.USER ? "user" : "assistant", content: m.text })),
-    { role: "user", content: newMessage }
-  ];
-
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-        "anthropic-dangerously-allow-browser": "true" 
-    },
-    body: JSON.stringify({
-      model: modelId,
-      messages: messages,
-      system: systemInstruction,
-      stream: true,
-      max_tokens: options.maxOutputTokens || 4096,
-      temperature: options.temperature
-    })
-  });
-
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error?.message || "Anthropic API Error");
-  }
-
-  if (!response.body) throw new Error("No response body");
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let fullText = "";
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    
-    const chunk = decoder.decode(value, { stream: true });
-    buffer += chunk;
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith("data: ")) {
-        try {
-          const json = JSON.parse(trimmed.slice(6));
-          if (json.type === 'content_block_delta' && json.delta?.text) {
-             const textPart = json.delta.text;
-             fullText += textPart;
-             onChunk(fullText);
-          }
-        } catch (e) { /* ignore */ }
-      }
-    }
-  }
-  return fullText;
-};
-
-/**
- * Google Gemini Implementation
- */
 const streamGoogleResponse = async (
   modelId: string,
   history: ChatMessage[],
@@ -225,7 +116,6 @@ const streamGoogleResponse = async (
   onChunk: (text: string) => void,
   options: GenerationOptions
 ): Promise<StreamResult> => {
-  // Initialize GoogleGenAI exclusively with process.env.API_KEY
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const googleHistory = history.map(msg => ({
@@ -241,13 +131,13 @@ const streamGoogleResponse = async (
 
   if (options.thinkingBudget && options.thinkingBudget > 0) {
     config.thinkingConfig = { thinkingBudget: options.thinkingBudget };
-    // Ensure maxOutputTokens is set and larger than thinking budget if needed
     if (!config.maxOutputTokens) config.maxOutputTokens = options.thinkingBudget + 2048;
   }
 
-  if (options.useSearch) {
-    config.tools = [{ googleSearch: {} }];
-  }
+  const tools = [];
+  if (options.useSearch) tools.push({ googleSearch: {} });
+  if (options.tools) tools.push({ functionDeclarations: options.tools });
+  if (tools.length > 0) config.tools = tools;
 
   const chat = ai.chats.create({
     model: modelId,
@@ -259,21 +149,26 @@ const streamGoogleResponse = async (
   
   let fullText = "";
   let groundingMetadata: GroundingMetadata | undefined;
+  let functionCalls: any[] | undefined;
 
   for await (const chunk of result) {
-    const text = chunk.text;
+    const c = chunk as GenerateContentResponse;
+    const text = c.text;
     if (text) {
       fullText += text;
       onChunk(fullText);
     }
     
-    const candidate = chunk.candidates?.[0];
-    if (candidate?.groundingMetadata) {
-      groundingMetadata = candidate.groundingMetadata as GroundingMetadata;
+    if (c.candidates?.[0]?.groundingMetadata) {
+      groundingMetadata = c.candidates[0].groundingMetadata as GroundingMetadata;
+    }
+
+    if (c.functionCalls) {
+      functionCalls = c.functionCalls;
     }
   }
 
-  return { text: fullText, groundingMetadata };
+  return { text: fullText, groundingMetadata, functionCalls };
 };
 
 export const generateSpeech = async (text: string, apiKey?: string, provider: AIProvider = 'google'): Promise<string> => {
@@ -286,7 +181,6 @@ export const generateSpeech = async (text: string, apiKey?: string, provider: AI
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
     },
   });
-  
   const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
   if (!audioData) throw new Error("Voice synthesis failure");
   return audioData;

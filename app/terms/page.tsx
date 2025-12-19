@@ -1,3 +1,4 @@
+
 export default function Terms() {
   return (
     <main style={{ padding: 24, backgroundColor: '#020617', color: '#cbd5e1', minHeight: '100vh', fontFamily: 'sans-serif' }}>
