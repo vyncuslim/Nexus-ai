@@ -2,12 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { Language } from '../types';
 import { UI_TEXT, validateInviteCode } from '../constants';
-import { OpenAIIcon, GoogleIcon, BrainIcon, SettingsIcon } from './Icon';
+import { OpenAIIcon, GoogleIcon, BrainIcon, SettingsIcon, DeepSeekIcon, GrokIcon } from './Icon';
 
 declare const google: any;
 
 interface AuthScreenProps {
-  onAuthSuccess: (inviteCode: string, name: string, keys: { openai?: string, google?: string, anthropic?: string, googleClientId?: string }, avatar?: string) => void;
+  onAuthSuccess: (inviteCode: string, name: string, keys: { openai?: string, google?: string, anthropic?: string, deepseek?: string, grok?: string, googleClientId?: string }, avatar?: string) => void;
   language: Language;
   initialClientId?: string;
 }
@@ -22,6 +22,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
   
   const [openaiKey, setOpenaiKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
+  const [deepseekKey, setDeepseekKey] = useState('');
+  const [grokKey, setGrokKey] = useState('');
   
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -117,15 +119,16 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onAuthSuccess(inviteCode, name, {
-      openai: openaiKey.startsWith('sk-') ? openaiKey.trim() : undefined,
-      anthropic: anthropicKey.startsWith('sk-ant') ? anthropicKey.trim() : undefined,
+      openai: openaiKey.trim() || undefined,
+      anthropic: anthropicKey.trim() || undefined,
+      deepseek: deepseekKey.trim() || undefined,
+      grok: grokKey.trim() || undefined,
       googleClientId: customClientId.trim()
     }, avatar);
   };
 
   return (
     <div className="fixed inset-0 bg-nexus-950 flex flex-col items-center justify-center z-50 p-4 overflow-hidden">
-      {/* Mothership Background Particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] animate-pulse-slow"></div>
          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px] animate-pulse-slow" style={{ animationDelay: '1s' }}></div>
@@ -138,12 +141,11 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
           </div>
         </div>
 
-        <div className="glass-panel rounded-[2.5rem] p-10 shadow-2xl border-white/5 relative overflow-hidden">
-            {/* Scanning line effect */}
+        <div className="glass-panel rounded-[2.5rem] p-8 shadow-2xl border-white/5 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent animate-[scan_3s_linear_infinite]"></div>
             
-            <div className="text-center mb-8">
-              <h1 className="text-2xl font-black italic text-white mb-2 uppercase tracking-tighter">{t.welcomeTitle}</h1>
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-black italic text-white mb-1 uppercase tracking-tighter">{t.welcomeTitle}</h1>
               <p className="text-gray-500 text-[9px] uppercase tracking-[0.4em] font-mono leading-none">
                 {step === 1 ? "Protocol_Entry" : step === 2 ? "Neural_Identity" : "Neural_Key_Link"}
               </p>
@@ -157,16 +159,14 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
 
             {step === 1 && (
               <form onSubmit={handleInviteSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <input 
-                    type="text" 
-                    value={inviteCode}
-                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                    className="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-6 py-4 focus:border-cyan-500/50 outline-none text-center font-mono text-base uppercase tracking-widest placeholder-gray-800 shadow-inner"
-                    placeholder={t.invitePlaceholder}
-                    autoFocus
-                  />
-                </div>
+                <input 
+                  type="text" 
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  className="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-6 py-4 focus:border-cyan-500/50 outline-none text-center font-mono text-base uppercase tracking-widest placeholder-gray-800 shadow-inner"
+                  placeholder={t.invitePlaceholder}
+                  autoFocus
+                />
                 <button type="submit" disabled={!inviteCode} className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-2xl font-bold shadow-xl shadow-cyan-500/10 transition-all active:scale-95 disabled:opacity-30">{t.nextBtn}</button>
               </form>
             )}
@@ -199,9 +199,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
                       />
                       <button type="submit" disabled={!name.trim()} className="w-full py-4 bg-white/5 text-white border border-white/10 rounded-2xl font-bold hover:bg-white/10 transition-all active:scale-95 disabled:opacity-30">Confirm Name</button>
                     </form>
-                    <button onClick={() => setShowIdConfig(true)} className="w-full py-2 text-[10px] text-gray-600 hover:text-white flex items-center justify-center gap-2 transition-colors">
-                      <SettingsIcon /> Neural_Config_ID
-                    </button>
                   </>
                 ) : (
                   <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -224,37 +221,40 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
             )}
 
              {step === 3 && (
-              <form onSubmit={handleFinalSubmit} className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+              <form onSubmit={handleFinalSubmit} className="space-y-4 animate-in slide-in-from-right-4 duration-300 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                 <div className="space-y-3">
                   <div className="p-3 bg-cyan-900/20 border border-cyan-500/20 rounded-xl flex items-center gap-3">
                      <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                     <span className="text-sm text-cyan-200">Google Gemini Connected</span>
+                     <span className="text-xs text-cyan-200 font-bold">Gemini Protocol Active</span>
                   </div>
+                  
                   <div className="relative group">
-                    <div className="absolute left-4 top-4 text-gray-700 group-focus-within:text-blue-500 transition-colors"><OpenAIIcon /></div>
-                    <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} className="w-full bg-black/40 border border-white/10 text-white rounded-2xl pl-12 pr-6 py-4 focus:border-cyan-500/50 outline-none font-mono text-xs placeholder-gray-800" placeholder={t.openaiKeyPlaceholder} />
+                    <div className="absolute left-4 top-3.5 text-gray-700 group-focus-within:text-blue-500 transition-colors"><DeepSeekIcon /></div>
+                    <input type="password" value={deepseekKey} onChange={(e) => setDeepseekKey(e.target.value)} className="w-full bg-black/40 border border-white/10 text-white rounded-2xl pl-12 pr-6 py-3.5 focus:border-cyan-500/50 outline-none font-mono text-xs placeholder-gray-800" placeholder={t.deepseekKeyPlaceholder} />
+                  </div>
+
+                  <div className="relative group">
+                    <div className="absolute left-4 top-3.5 text-gray-700 group-focus-within:text-white transition-colors"><GrokIcon /></div>
+                    <input type="password" value={grokKey} onChange={(e) => setGrokKey(e.target.value)} className="w-full bg-black/40 border border-white/10 text-white rounded-2xl pl-12 pr-6 py-3.5 focus:border-cyan-500/50 outline-none font-mono text-xs placeholder-gray-800" placeholder={t.grokKeyPlaceholder} />
+                  </div>
+
+                  <div className="relative group">
+                    <div className="absolute left-4 top-3.5 text-gray-700 group-focus-within:text-emerald-500 transition-colors"><OpenAIIcon /></div>
+                    <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} className="w-full bg-black/40 border border-white/10 text-white rounded-2xl pl-12 pr-6 py-3.5 focus:border-cyan-500/50 outline-none font-mono text-xs placeholder-gray-800" placeholder={t.openaiKeyPlaceholder} />
                   </div>
                 </div>
-                <button type="submit" className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-2xl font-bold shadow-xl shadow-cyan-500/20 transition-all active:scale-95">{t.connectBtn}</button>
-                <p className="text-[10px] text-gray-700 text-center font-mono opacity-60 uppercase tracking-widest">Nexus_Security: Local_Storage_Only</p>
+                <button type="submit" className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-2xl font-bold shadow-xl shadow-cyan-500/20 transition-all active:scale-95 sticky bottom-0">{t.connectBtn}</button>
+                <p className="text-[9px] text-gray-700 text-center font-mono opacity-60 uppercase tracking-widest pt-2">Nexus_Security: Edge_Storage_Mode</p>
               </form>
             )}
 
-            <div className="mt-10 flex justify-center gap-1">
+            <div className="mt-8 flex justify-center gap-1">
                <div className={`h-1.5 rounded-full transition-all duration-300 ${step >= 1 ? 'w-8 bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'w-3 bg-white/5'}`}></div>
                <div className={`h-1.5 rounded-full transition-all duration-300 ${step >= 2 ? 'w-8 bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'w-3 bg-white/5'}`}></div>
                <div className={`h-1.5 rounded-full transition-all duration-300 ${step >= 3 ? 'w-8 bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'w-3 bg-white/5'}`}></div>
             </div>
         </div>
       </div>
-      <style>{`
-        @keyframes scan {
-          0% { top: 0; opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { top: 100%; opacity: 0; }
-        }
-      `}</style>
     </div>
   );
 };
