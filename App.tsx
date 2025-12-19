@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
 import AuthScreen from './components/AuthScreen';
 import { 
-  SendIcon, BrainIcon, LabIcon, MemoryIcon, MenuIcon, AgentIcon, ActivityIcon, LinkIcon, TrashIcon
+  SendIcon, BrainIcon, LabIcon, MemoryIcon, MenuIcon, AgentIcon, ActivityIcon, LinkIcon, TrashIcon, XIcon
 } from './components/Icon';
 import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, AGENT_INSTRUCTION, UI_TEXT, PERSONAS, DATABASE_TOOLS } from './constants';
 import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, GlobalMemory, AppSettings, DatabaseRecord } from './types';
@@ -23,6 +23,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [globalMemories, setGlobalMemories] = useState<GlobalMemory[]>([]);
   const [database, setDatabase] = useState<DatabaseRecord[]>([]);
+  const [dbSearch, setDbSearch] = useState("");
   const [isDbAccessing, setIsDbAccessing] = useState(false);
   
   const [currentPersonaId, setCurrentPersonaId] = useState<string>('default');
@@ -139,36 +140,42 @@ function App() {
         if (res.functionCalls && res.functionCalls.length > 0) {
           setIsDbAccessing(true);
           const toolResults = [];
+          
+          // Use current database state
+          let currentDb = [...database];
+          const stored = localStorage.getItem('nexus_database');
+          if (stored) currentDb = JSON.parse(stored);
+
           for (const call of res.functionCalls) {
             let result = "error: unknown tool";
             if (call.name === 'query_database') {
-              const filter = (call.args.filter || '').toLowerCase();
-              const found = database.filter(r => r.content.toLowerCase().includes(filter));
-              result = found.length > 0 ? JSON.stringify(found) : "No records found.";
+              const query = (call.args.query || '').toLowerCase();
+              const found = currentDb.filter(r => r.content.toLowerCase().includes(query));
+              result = found.length > 0 ? JSON.stringify(found) : "No relevant records found.";
             } else if (call.name === 'update_database') {
               const { action, content, id } = call.args;
-              if (action === 'add' && content) {
-                const newRec = { id: uuidv4().slice(0, 8), content, timestamp: Date.now() };
-                const newDb = [newRec, ...database];
-                setDatabase(newDb);
-                localStorage.setItem('nexus_database', JSON.stringify(newDb));
-                result = `Successfully added: ${content} (ID: ${newRec.id})`;
-              } else if (action === 'remove' && id) {
-                const newDb = database.filter(r => r.id !== id);
-                setDatabase(newDb);
-                localStorage.setItem('nexus_database', JSON.stringify(newDb));
-                result = `Successfully removed record ${id}`;
-              } else if (action === 'clear') {
-                setDatabase([]);
-                localStorage.setItem('nexus_database', "[]");
-                result = "Database cleared.";
+              if (action === 'create' && content) {
+                const newRec = { id: uuidv4().slice(0, 8).toUpperCase(), content, timestamp: Date.now() };
+                currentDb = [newRec, ...currentDb];
+                result = `Record Created: ${content} (ID: ${newRec.id})`;
+              } else if (action === 'delete' && id) {
+                currentDb = currentDb.filter(r => r.id !== id);
+                result = `Record ${id} Deleted.`;
+              } else if (action === 'purge_all') {
+                currentDb = [];
+                result = "Database completely purged.";
               }
             }
             toolResults.push({ name: call.name, result });
           }
+
+          // Persist changes
+          setDatabase(currentDb);
+          localStorage.setItem('nexus_database', JSON.stringify(currentDb));
           setIsDbAccessing(false);
-          // 自动反馈给 AI
-          await executeChatLoop(`TOOL_RESPONSE: ${JSON.stringify(toolResults)}`, true);
+
+          // Return TOOL_RESULT to conversation as a hidden system message
+          await executeChatLoop(`TOOL_RESULT: ${JSON.stringify(toolResults)}`, true);
         } else {
           const finalMsg = target!.messages.find(m => m.id === mid);
           if (finalMsg) { finalMsg.text = res.text; finalMsg.groundingMetadata = res.groundingMetadata; }
@@ -190,6 +197,7 @@ function App() {
   }} language={language} />;
 
   const currentMessages = sessions.find(s => s.id === currentSessionId)?.messages || [];
+  const filteredDb = database.filter(r => r.content.toLowerCase().includes(dbSearch.toLowerCase()) || r.id.toLowerCase().includes(dbSearch.toLowerCase()));
 
   return (
     <div className="flex h-screen mothership-bg text-slate-300 font-sans overflow-hidden">
@@ -207,6 +215,7 @@ function App() {
                     {isDbAccessing ? 'NEURAL_DB_ACCESSING' : settings.isAgentMode ? `AGENT_MATRIX [TYPE: ${settings.agentType}]` : 'Uplink_Secure'}
                  </span>
                </div>
+               {settings.isAgentMode && <span className="text-[7px] text-nexus-purple/40 font-mono tracking-[0.3em] uppercase ml-3.5">Persistent_Storage_Active</span>}
              </div>
           </div>
           <div className="flex items-center gap-3">
@@ -228,11 +237,11 @@ function App() {
                   {settings.isAgentMode ? <AgentIcon /> : <BrainIcon />}
                 </div>
                 <h1 className="text-4xl font-black italic text-white uppercase tracking-tighter">Nexus Agent Matrix</h1>
-                <p className="text-[10px] text-gray-600 font-mono tracking-[0.5em] mt-4 uppercase italic">Database_Link_Established</p>
+                <p className="text-[10px] text-gray-600 font-mono tracking-[0.5em] mt-4 uppercase italic">Neural_Database_Engine_v5</p>
               </div>
             ) : (
               <div className="space-y-8 pb-32">
-                {currentMessages.filter(m => !m.text.startsWith('TOOL_RESPONSE')).map((msg) => (<MessageBubble key={msg.id} message={msg} apiContext={{ apiKey: process.env.API_KEY || "", provider: 'google' }} />))}
+                {currentMessages.map((msg) => (<MessageBubble key={msg.id} message={msg} apiContext={{ apiKey: process.env.API_KEY || "", provider: 'google' }} />))}
                 <div ref={messagesEndRef} />
               </div>
             )}
@@ -242,7 +251,7 @@ function App() {
         <div className="px-6 py-8 absolute bottom-0 left-0 right-0 pointer-events-none">
           <div className={`max-w-3xl mx-auto glass-panel p-2.5 rounded-[3rem] pointer-events-auto border-white/10 shadow-3xl backdrop-blur-3xl ring-1 transition-all duration-500 ${settings.isAgentMode ? 'ring-nexus-purple/40 border-nexus-purple/20' : 'ring-white/10'}`}>
             <div className="flex items-end gap-3 px-4 py-2">
-               <textarea rows={1} value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={settings.isAgentMode ? "Command AI to query or update neural database..." : t.placeholder} className="flex-1 bg-transparent text-white px-3 py-3.5 focus:outline-none resize-none text-sm font-medium placeholder-gray-800 max-h-60 custom-scrollbar" />
+               <textarea rows={1} value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={settings.isAgentMode ? "Instruct Agent to manage neural database..." : t.placeholder} className="flex-1 bg-transparent text-white px-3 py-3.5 focus:outline-none resize-none text-sm font-medium placeholder-gray-800 max-h-60 custom-scrollbar" />
                <button onClick={handleSendMessage} disabled={isLoading || !inputValue.trim()} className={`p-4.5 rounded-[2rem] transition-all shadow-2xl active:scale-95 ${inputValue.trim() && !isLoading ? (settings.isAgentMode ? 'bg-nexus-purple text-white' : 'bg-nexus-accent text-black font-black') : 'bg-white/5 text-gray-700 opacity-20'}`}>
                  {isLoading ? <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></div> : <SendIcon />}
                </button>
@@ -253,24 +262,39 @@ function App() {
 
       <aside className={`fixed inset-y-0 right-0 z-40 w-full sm:w-80 glass-panel border-l transform transition-all duration-500 ease-in-out ${labOpen ? 'translate-x-0' : 'translate-x-full'} bg-nexus-950/95 backdrop-blur-3xl shadow-2xl flex flex-col`}>
         <div className="p-6 border-b border-white/5 flex items-center justify-between">
-          <div className="text-[10px] font-black tracking-widest text-white uppercase flex items-center gap-2"><LabIcon /> NEURAL_DATA_STORE</div>
+          <div className="text-[10px] font-black tracking-widest text-white uppercase flex items-center gap-2"><LabIcon /> DATA_CONSOLE</div>
           <button onClick={() => setLabOpen(false)} className="text-gray-500 hover:text-white p-2">✕</button>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+        <div className="p-4 border-b border-white/5">
+            <input 
+              type="text" 
+              placeholder="Filter Records..." 
+              value={dbSearch}
+              onChange={(e) => setDbSearch(e.target.value)}
+              className="w-full bg-black/40 border border-white/5 rounded-2xl px-4 py-3 text-[10px] text-white focus:outline-none focus:border-nexus-accent/30 placeholder-gray-800"
+            />
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
            <section>
-              <h3 className="text-[10px] font-black text-gray-600 uppercase mb-4 flex items-center gap-2 tracking-widest"><ActivityIcon /> LIVE_DATABASE</h3>
+              <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[10px] font-black text-gray-600 uppercase flex items-center gap-2 tracking-widest"><ActivityIcon /> Neural_Records</h3>
+                  <button onClick={() => {setDatabase([]); localStorage.setItem('nexus_database', "[]")}} className="text-[8px] font-black text-red-500/50 hover:text-red-500 uppercase tracking-widest">Wipe_All</button>
+              </div>
               <div className="space-y-3">
-                 {database.length === 0 ? (
-                   <div className="text-center py-10 border border-dashed border-white/5 rounded-3xl text-gray-800 italic text-[10px] uppercase">Database_Empty</div>
+                 {filteredDb.length === 0 ? (
+                   <div className="text-center py-20 border border-dashed border-white/5 rounded-3xl text-gray-800 italic text-[10px] uppercase">No_Records_Found</div>
                  ) : (
-                   database.map(record => (
-                     <div key={record.id} className="p-4 prism-card rounded-2xl group border-white/5 relative overflow-hidden">
+                   filteredDb.map(record => (
+                     <div key={record.id} className="p-4 prism-card rounded-[1.5rem] group border-white/5 relative overflow-hidden animate-in slide-in-from-right-4">
                         <div className="flex justify-between items-start mb-2">
-                           <span className="text-[8px] font-mono text-nexus-accent tracking-tighter bg-nexus-accent/10 px-1.5 py-0.5 rounded-md">#{record.id}</span>
-                           <button onClick={() => setDatabase(database.filter(r => r.id !== record.id))} className="opacity-0 group-hover:opacity-100 text-red-500/50 hover:text-red-500 transition-all"><TrashIcon /></button>
+                           <span className="text-[8px] font-mono text-nexus-purple tracking-tighter bg-nexus-purple/10 px-1.5 py-0.5 rounded-md border border-nexus-purple/20">REC_{record.id}</span>
+                           <button onClick={() => {const ndb = database.filter(r => r.id !== record.id); setDatabase(ndb); localStorage.setItem('nexus_database', JSON.stringify(ndb))}} className="opacity-0 group-hover:opacity-100 text-red-500/50 hover:text-red-500 transition-all"><TrashIcon /></button>
                         </div>
                         <p className="text-xs text-gray-300 leading-relaxed font-medium uppercase tracking-tight">{record.content}</p>
-                        <div className="mt-2 text-[7px] text-gray-700 font-mono italic">{new Date(record.timestamp).toLocaleString()}</div>
+                        <div className="mt-2 pt-2 border-t border-white/5 text-[7px] text-gray-700 font-mono italic flex justify-between">
+                            <span>{new Date(record.timestamp).toLocaleDateString()}</span>
+                            <span>{new Date(record.timestamp).toLocaleTimeString()}</span>
+                        </div>
                      </div>
                    ))
                  )}

@@ -41,9 +41,11 @@ const CodeBlock: React.FC<{ content: string }> = ({ content }) => {
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) => {
   const isUser = message.role === Role.USER;
   const isError = message.isError;
+  const isTool = message.text.startsWith('TOOL_RESULT:');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [showThought, setShowThought] = useState(false);
+  const [showToolDetails, setShowToolDetails] = useState(false);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   useEffect(() => {
@@ -76,14 +78,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
     const planMatch = text.match(/<plan>([\s\S]*?)<\/plan>/);
     const thought = thoughtMatch ? thoughtMatch[1].trim() : null;
     const plan = planMatch ? planMatch[1].trim().split('\n').filter(s => s.trim()) : null;
-    const cleanText = text
+    let cleanText = text
       .replace(/<thought>[\s\S]*?<\/thought>/, '')
       .replace(/<plan>[\s\S]*?<\/plan>/, '')
       .trim();
+    
+    // Hide tool results from main text flow but keep flag
+    if (text.startsWith('TOOL_RESULT:')) {
+        return { thought, plan, cleanText: null, toolData: text.replace('TOOL_RESULT:', '').trim() };
+    }
+
     return { thought, plan, cleanText };
   };
 
-  const { thought, plan, cleanText } = parseAgentContent(message.text);
+  const { thought, plan, cleanText, toolData } = parseAgentContent(message.text);
 
   const formatText = (text: string) => {
     const parts = text.split(/(```[\s\S]*?```|\[.*?\]\(.*?\)|https?:\/\/[^\s]+|\*\*.*?\*\*|`.*?`)/g);
@@ -112,6 +120,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
     );
   };
 
+  if (toolData && !showToolDetails) {
+      return (
+        <div className="flex w-full justify-start mb-4 animate-in fade-in">
+           <div className="ml-14 flex items-center gap-2 px-3 py-1.5 bg-nexus-purple/10 border border-nexus-purple/20 rounded-full cursor-pointer hover:bg-nexus-purple/20 transition-all" onClick={() => setShowToolDetails(true)}>
+              <ActivityIcon />
+              <span className="text-[9px] font-black text-nexus-purple uppercase tracking-widest">Neural_DB_Operation_Completed</span>
+              <ChevronDownIcon />
+           </div>
+        </div>
+      );
+  }
+
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-10 animate-in fade-in slide-in-from-bottom-2 duration-300`}>
       <div className={`flex max-w-[95%] md:max-w-[85%] gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -120,29 +140,37 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
           flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center overflow-hidden border
           ${isUser ? 'bg-nexus-accent border-white/10 shadow-lg' : isError ? 'bg-red-500/20 border-red-500/30' : 'bg-nexus-900 border-white/5 shadow-xl'}
         `}>
-          {isUser ? <div className="text-black"><UserIcon /></div> : <div className="text-white">{plan ? <AgentIcon /> : <RobotIcon />}</div>}
+          {isUser ? <div className="text-black"><UserIcon /></div> : <div className="text-white">{plan || toolData ? <AgentIcon /> : <RobotIcon />}</div>}
         </div>
 
         <div className={`
           relative px-6 py-5 rounded-[2rem] shadow-2xl border transition-all duration-300
           ${isUser ? 'bg-nexus-accent text-gray-950 rounded-tr-sm border-transparent' : 'bg-nexus-900/60 text-gray-100 rounded-tl-sm border-white/5 backdrop-blur-3xl'}
-          ${plan ? 'ring-1 ring-nexus-purple/30' : ''}
+          ${plan || toolData ? 'ring-1 ring-nexus-purple/30' : ''}
         `}>
           <div className="flex justify-between items-center mb-4">
             <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isUser ? 'text-black/50' : 'text-gray-600'}`}>
-              {isUser ? 'Neural_Signal' : plan ? 'Agent_Execution' : 'Nexus_Response'}
+              {isUser ? 'Neural_Signal' : toolData ? 'Database_I/O' : plan ? 'Agent_Execution' : 'Nexus_Response'}
             </span>
-            {!isUser && !isError && (
+            {!isUser && !isError && cleanText && (
               <button onClick={toggleSpeech} disabled={isLoadingAudio} className="p-1.5 rounded-lg hover:bg-white/5 text-gray-600 hover:text-white transition-colors">
                 {isLoadingAudio ? <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin block"></span> : isSpeaking ? <StopIcon /> : <SpeakerIcon />}
               </button>
             )}
+            {toolData && <button onClick={() => setShowToolDetails(false)} className="text-gray-500 hover:text-white"><XIcon /></button>}
           </div>
+
+          {toolData && (
+              <div className="p-4 bg-black/40 rounded-2xl border border-nexus-purple/20 font-mono text-[10px] text-nexus-purple/80 mb-2 overflow-x-auto">
+                 <div className="mb-2 text-[8px] opacity-40 uppercase tracking-widest font-black">JSON_IO_LOG</div>
+                 {toolData}
+              </div>
+          )}
 
           {plan && (
              <div className="mb-6 space-y-3">
                 <div className="flex items-center gap-2 text-nexus-purple text-[10px] font-black uppercase tracking-widest border-b border-nexus-purple/10 pb-2">
-                   <ActivityIcon /> Operational_Mission_Plan
+                   <ActivityIcon /> Mission_Action_Chain
                 </div>
                 <div className="grid grid-cols-1 gap-2">
                    {plan.map((step, idx) => (
@@ -165,9 +193,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, apiContext }) =>
             </div>
           )}
 
-          <div className="text-sm md:text-base selection:bg-nexus-accent/40 leading-relaxed">
-            {formatText(cleanText || (isError ? message.text : ""))}
-          </div>
+          {cleanText && (
+            <div className="text-sm md:text-base selection:bg-nexus-accent/40 leading-relaxed">
+              {formatText(cleanText || (isError ? message.text : ""))}
+            </div>
+          )}
 
           {message.groundingMetadata?.groundingChunks && (
             <div className="mt-6 pt-5 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-3">
