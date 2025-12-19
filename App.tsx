@@ -329,7 +329,6 @@ function App() {
         </div>
       </div>
 
-      {/* Analytics Lab - Responsive Width */}
       <aside className={`fixed inset-y-0 right-0 z-40 w-full sm:w-80 glass-panel border-l transform transition-all duration-500 ease-in-out ${labOpen ? 'translate-x-0' : 'translate-x-full'} bg-nexus-950/95 backdrop-blur-3xl shadow-2xl flex flex-col`}>
         <div className="p-5 border-b border-white/5 flex items-center justify-between">
           <div className="text-[10px] font-black tracking-widest text-white uppercase flex items-center gap-2">
