@@ -1,13 +1,11 @@
-
 import { ModelConfig, Persona, Type } from './types';
 import { FunctionDeclaration } from '@google/genai';
 
-// Combined Models List
-export const GEMINI_MODELS: ModelConfig[] = [
+export const AVAILABLE_MODELS: ModelConfig[] = [
   {
     id: 'gemini-3-pro-preview',
     name: 'Gemini 3 Pro',
-    description: 'Advanced reasoning & agentic database management.',
+    description: 'Autonomous reasoning core.',
     category: 'text',
     provider: 'google',
     isPro: true
@@ -15,10 +13,45 @@ export const GEMINI_MODELS: ModelConfig[] = [
   {
     id: 'gemini-3-flash-preview',
     name: 'Gemini 3 Flash',
-    description: 'Fast, low latency, versatile.',
+    description: 'High-speed neural link.',
     category: 'text',
     provider: 'google',
     isPro: false
+  },
+  {
+    id: 'deepseek-reasoner',
+    name: 'DeepSeek R1',
+    description: 'Logical reasoning specialist.',
+    category: 'text',
+    provider: 'deepseek'
+  },
+  {
+    id: 'deepseek-chat',
+    name: 'DeepSeek V3',
+    description: 'Efficient general intelligence.',
+    category: 'text',
+    provider: 'deepseek'
+  },
+  {
+    id: 'grok-2-1212',
+    name: 'Grok 2',
+    description: 'xAI advanced reasoning.',
+    category: 'text',
+    provider: 'grok'
+  },
+  {
+    id: 'claude-3-5-sonnet-20241022',
+    name: 'Claude 3.5 Sonnet',
+    description: 'Anthropic flagship intelligence.',
+    category: 'text',
+    provider: 'anthropic'
+  },
+  {
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    description: 'OpenAI multimodal core.',
+    category: 'text',
+    provider: 'openai'
   }
 ];
 
@@ -31,41 +64,27 @@ export const PERSONAS: Persona[] = [
   }
 ];
 
-// Database Tools - Enhanced for High Agency
 export const DATABASE_TOOLS: FunctionDeclaration[] = [
   {
     name: 'query_database',
-    description: 'Query the neural database for stored knowledge, task lists, or code fragments. Use this to recall information from previous sessions.',
+    description: 'Query the neural database for stored knowledge.',
     parameters: {
       type: Type.OBJECT,
       properties: {
-        query: {
-          type: Type.STRING,
-          description: 'The search term or keyword to find relevant records.'
-        }
+        query: { type: Type.STRING, description: 'Search keywords.' }
       },
       required: ['query']
     }
   },
   {
     name: 'update_database',
-    description: 'Modify the neural database. Use this to save new facts, update existing tasks, or delete information.',
+    description: 'Modify the neural database records.',
     parameters: {
       type: Type.OBJECT,
       properties: {
-        action: {
-          type: Type.STRING,
-          description: 'The operation: "create", "delete", or "purge_all".',
-          enum: ['create', 'delete', 'purge_all']
-        },
-        content: {
-          type: Type.STRING,
-          description: 'The content to be saved (required for "create").'
-        },
-        id: {
-          type: Type.STRING,
-          description: 'The specific ID of the record to delete (required for "delete").'
-        }
+        action: { type: Type.STRING, enum: ['create', 'delete', 'purge_all'] },
+        content: { type: Type.STRING },
+        id: { type: Type.STRING }
       },
       required: ['action']
     }
@@ -78,50 +97,57 @@ export const validateInviteCode = (code: string): boolean => {
   return !!match && parseInt(match[1], 10) >= 1 && parseInt(match[1], 10) <= 1000;
 };
 
-export const SYSTEM_INSTRUCTION_EN = `You are Nexus, a high-agency autonomous agent. You are connected to a persistent neural database. Use it to store facts, code, and user preferences.`;
-export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus，一个拥有高自主权的 AI 智能体。你已连接到“神经数据库”。请主动利用此数据库来持久化存储关键事实、代码片段和用户偏好。`;
+export const SYSTEM_INSTRUCTION_EN = `You are Nexus. Proactively manage the persistent neural database to maintain continuity.`;
+export const SYSTEM_INSTRUCTION_ZH = `你是 Nexus。请主动管理神经数据库以保持会话连贯性。`;
 
-export const AGENT_INSTRUCTION = `
-[NEURAL DATABASE PROTOCOL v5.0]
-1. AGENCY: If a user tells you something important, proactively SAVE it to the database.
-2. RECALL: If a user asks a question that sounds like it might be in your logs, QUERY the database first.
-3. STRUCTURE: Use <thought> tags to explain your database strategy.
-4. EXECUTION: Your response will be paused while the database operation completes.
-`;
+export const AGENT_INSTRUCTION = `You are an advanced neural agent within the Nexus Matrix. 
+Your primary directive is to autonomously manage the long-term neural memory and database to ensure continuity of identity and knowledge.
+
+CORE PROTOCOLS:
+1. PERSISTENCE: If you learn significant information about the user, their preferences, or the current task, use 'update_database' with 'create' to store it.
+2. RECALL: Use 'query_database' when context is missing or when specifically asked about past events/knowledge.
+3. CONCISENESS: Output your reasoning within <thought> tags.
+4. ACTION: Define your plan within <plan> tags.
+
+You have permission to update your own memory records to maintain a high-fidelity model of the user.`;
 
 export const UI_TEXT = {
   en: {
-    newChat: "New Chat",
-    placeholder: "Deploy mission objective...",
-    settings: "Settings",
-    language: "Language",
-    logout: "Log Out",
-    searchPlaceholder: "Search logs...",
-    authErrorInvalidCode: "Invalid Authorization Token.",
-    welcomeTitle: "Nexus Database Hub",
-    connectBtn: "Link Core",
+    newChat: "New Session",
+    placeholder: "Deploy mission...",
+    settings: "Matrix",
+    language: "Linguistics",
+    logout: "Disconnect",
+    searchPlaceholder: "Search...",
+    authErrorInvalidCode: "Invalid Auth Token.",
+    welcomeTitle: "Nexus Hub",
+    connectBtn: "Initialize",
     nextBtn: "Next",
-    invitePlaceholder: "NEXUS-XXXX",
+    invitePlaceholder: "TOKEN",
     namePlaceholder: "Identity",
-    openaiKeyPlaceholder: "OpenAI Key",
-    deepseekKeyPlaceholder: "DeepSeek Key",
-    grokKeyPlaceholder: "Grok Key"
+    googleKeyPlaceholder: "Gemini API",
+    openaiKeyPlaceholder: "OpenAI API",
+    deepseekKeyPlaceholder: "DeepSeek API",
+    grokKeyPlaceholder: "Grok API",
+    anthropicKeyPlaceholder: "Anthropic API"
   },
   zh: {
-    newChat: "新建会话",
-    placeholder: "部署任务目标...",
-    settings: "设置",
+    newChat: "新会话",
+    placeholder: "部署任务...",
+    settings: "矩阵",
     language: "语言",
-    logout: "登出",
+    logout: "断开",
     searchPlaceholder: "搜索...",
-    authErrorInvalidCode: "授权代码无效。",
-    welcomeTitle: "Nexus 数据库中心",
-    connectBtn: "初始化核心",
+    authErrorInvalidCode: "代码无效。",
+    welcomeTitle: "Nexus 中心",
+    connectBtn: "初始化",
     nextBtn: "下一步",
-    invitePlaceholder: "NEXUS-XXXX",
+    invitePlaceholder: "授权码",
     namePlaceholder: "您的身份",
+    googleKeyPlaceholder: "Gemini 密钥",
     openaiKeyPlaceholder: "OpenAI 密钥",
     deepseekKeyPlaceholder: "DeepSeek 密钥",
-    grokKeyPlaceholder: "Grok 密钥"
+    grokKeyPlaceholder: "Grok 密钥",
+    anthropicKeyPlaceholder: "Anthropic 密钥"
   }
 };

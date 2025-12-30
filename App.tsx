@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
@@ -6,7 +5,7 @@ import AuthScreen from './components/AuthScreen';
 import { 
   SendIcon, BrainIcon, LabIcon, MemoryIcon, MenuIcon, AgentIcon, ActivityIcon, LinkIcon, TrashIcon, XIcon
 } from './components/Icon';
-import { GEMINI_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, AGENT_INSTRUCTION, UI_TEXT, PERSONAS, DATABASE_TOOLS } from './constants';
+import { AVAILABLE_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, AGENT_INSTRUCTION, UI_TEXT, PERSONAS, DATABASE_TOOLS } from './constants';
 import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, GlobalMemory, AppSettings, DatabaseRecord } from './types';
 import { streamGeminiResponse } from './services/geminiService';
 import { useHistory } from './hooks/useHistory';
@@ -14,7 +13,9 @@ import { v4 as uuidv4 } from 'uuid';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [googleKey, setGoogleKey] = useState<string>('');
   const [openaiKey, setOpenaiKey] = useState<string>('');
+  const [anthropicKey, setAnthropicKey] = useState<string>('');
   const [deepseekKey, setDeepseekKey] = useState<string>('');
   const [grokKey, setGrokKey] = useState<string>('');
   
@@ -48,15 +49,21 @@ function App() {
   const setInputValue = inputControl.set;
 
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelConfig>(GEMINI_MODELS[0]);
+  const [selectedModel, setSelectedModel] = useState<ModelConfig>(AVAILABLE_MODELS[0]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const t = UI_TEXT[language];
 
-  // Fix: Define providerKey in the render scope for use in MessageBubble
-  const providerKey = selectedModel.provider === 'google' 
-    ? (process.env.API_KEY || "") 
-    : (selectedModel.provider === 'openai' ? openaiKey : (selectedModel.provider === 'deepseek' ? deepseekKey : grokKey));
+  const getProviderKey = useCallback((provider: string) => {
+    switch (provider) {
+      case 'google': return googleKey;
+      case 'openai': return openaiKey;
+      case 'anthropic': return anthropicKey;
+      case 'deepseek': return deepseekKey;
+      case 'grok': return grokKey;
+      default: return "";
+    }
+  }, [googleKey, openaiKey, anthropicKey, deepseekKey, grokKey]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -79,7 +86,9 @@ function App() {
     if (storedKeys) {
       try {
         const keys = JSON.parse(storedKeys);
+        if (keys.google) setGoogleKey(keys.google);
         if (keys.openai) setOpenaiKey(keys.openai);
+        if (keys.anthropic) setAnthropicKey(keys.anthropic);
         if (keys.deepseek) setDeepseekKey(keys.deepseek);
         if (keys.grok) setGrokKey(keys.grok);
       } catch(e) {}
@@ -91,13 +100,17 @@ function App() {
     localStorage.setItem('nexus_app_settings', JSON.stringify(newSettings));
   };
 
-  const handleUpdateApiKeys = (keys: { openai?: string, deepseek?: string, grok?: string }) => {
+  const handleUpdateApiKeys = (keys: { google?: string, openai?: string, anthropic?: string, deepseek?: string, grok?: string }) => {
+    if (keys.google !== undefined) setGoogleKey(keys.google);
     if (keys.openai !== undefined) setOpenaiKey(keys.openai);
+    if (keys.anthropic !== undefined) setAnthropicKey(keys.anthropic);
     if (keys.deepseek !== undefined) setDeepseekKey(keys.deepseek);
     if (keys.grok !== undefined) setGrokKey(keys.grok);
     
     localStorage.setItem('nexus_api_keys', JSON.stringify({
+      google: keys.google ?? googleKey,
       openai: keys.openai ?? openaiKey,
+      anthropic: keys.anthropic ?? anthropicKey,
       deepseek: keys.deepseek ?? deepseekKey,
       grok: keys.grok ?? grokKey
     }));
@@ -106,9 +119,8 @@ function App() {
   const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim() || isLoading || !user) return;
 
-    let providerKey = selectedModel.provider === 'openai' ? openaiKey : (selectedModel.provider === 'deepseek' ? deepseekKey : grokKey);
-    if (selectedModel.provider === 'google') providerKey = process.env.API_KEY || "";
-
+    const currentKey = getProviderKey(selectedModel.provider);
+    
     let targetId = currentSessionId;
     let target = sessions.find(s => s.id === targetId);
     let updated = [...sessions];
@@ -154,7 +166,7 @@ function App() {
               return n;
             }, true);
           }, 
-          providerKey, 
+          currentKey, 
           { 
             useSearch: settings.useSearch, 
             tools: settings.isAgentMode ? DATABASE_TOOLS : undefined,
@@ -212,15 +224,13 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, openaiKey, deepseekKey, grokKey, language, settings, globalMemories, database]);
+  }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, getProviderKey, language, settings, globalMemories, database]);
 
   if (!user) return <AuthScreen onAuthSuccess={(inviteCode, name, keys) => {
     const u = { id: btoa(inviteCode + name), name, email: inviteCode };
     setUser(u); 
     localStorage.setItem('nexus_user_v3', JSON.stringify(u));
-    if (keys.openai || keys.deepseek || keys.grok) {
-      handleUpdateApiKeys({ openai: keys.openai, deepseek: keys.deepseek, grok: keys.grok });
-    }
+    handleUpdateApiKeys(keys);
   }} language={language} />;
 
   const currentMessages = sessions.find(s => s.id === currentSessionId)?.messages || [];
@@ -242,7 +252,7 @@ function App() {
         onToggleLanguage={() => setLanguage(language === 'en' ? 'zh' : 'en')} 
         currentPersonaId={currentPersonaId} 
         onUpdatePersona={setCurrentPersonaId} 
-        apiKeys={{ google: "HIDDEN_SYSTEM_KEY", openai: openaiKey, anthropic: "", deepseek: deepseekKey, grok: grokKey }} 
+        apiKeys={{ google: googleKey, openai: openaiKey, anthropic: anthropicKey, deepseek: deepseekKey, grok: grokKey }} 
         onUpdateApiKeys={handleUpdateApiKeys} 
         appSettings={settings} 
         onUpdateSettings={handleUpdateSettings} 
@@ -267,8 +277,8 @@ function App() {
           </div>
           <div className="flex items-center gap-3">
              <div className="flex items-center gap-2 px-4 py-1.5 bg-white/5 border border-white/5 rounded-2xl">
-                <select value={selectedModel.id} onChange={(e) => setSelectedModel(GEMINI_MODELS.find(m => m.id === e.target.value) || GEMINI_MODELS[0])} className="bg-transparent text-[10px] font-bold text-gray-400 outline-none cursor-pointer uppercase tracking-tight">
-                  {GEMINI_MODELS.map(m => (<option key={m.id} value={m.id} className="bg-nexus-900">{m.name}</option>))}
+                <select value={selectedModel.id} onChange={(e) => setSelectedModel(AVAILABLE_MODELS.find(m => m.id === e.target.value) || AVAILABLE_MODELS[0])} className="bg-transparent text-[10px] font-bold text-gray-400 outline-none cursor-pointer uppercase tracking-tight max-w-[120px] md:max-w-none">
+                  {AVAILABLE_MODELS.map(m => (<option key={m.id} value={m.id} className="bg-nexus-900">{m.name} ({m.provider})</option>))}
                 </select>
              </div>
              <button onClick={() => setLabOpen(!labOpen)} className={`p-2.5 rounded-xl transition-all ${labOpen ? 'text-nexus-accent bg-nexus-accent/10 border border-nexus-accent/20' : 'text-gray-500 hover:text-white border border-transparent'}`}><LabIcon /></button>
@@ -288,7 +298,7 @@ function App() {
               </div>
             ) : (
               <div className="space-y-8 pb-32">
-                {currentMessages.map((msg) => (<MessageBubble key={msg.id} message={msg} apiContext={{ apiKey: providerKey, provider: selectedModel.provider }} />))}
+                {currentMessages.map((msg) => (<MessageBubble key={msg.id} message={msg} apiContext={{ apiKey: getProviderKey(selectedModel.provider), provider: selectedModel.provider }} />))}
                 <div ref={messagesEndRef} />
               </div>
             )}
