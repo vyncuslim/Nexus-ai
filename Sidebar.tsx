@@ -58,19 +58,24 @@ const Sidebar: React.FC<SidebarProps> = ({
     setTimeout(() => {
       setIsSaving(false);
       setShowSettingsModal(false);
-    }, 600);
+    }, 800);
   };
 
-  const KeyInput = ({ icon, provider, value, onChange, placeholder }: any) => (
-    <div className="relative group">
-      <div className="absolute left-4 top-3.5 text-gray-700 group-focus-within:text-nexus-accent transition-colors">{icon}</div>
-      <input 
-        type="password" 
-        value={value} 
-        onChange={onChange}
-        className="w-full bg-black/40 border border-white/5 text-white rounded-2xl pl-12 pr-4 py-3 focus:border-nexus-accent/40 outline-none font-mono text-[11px] placeholder-gray-800" 
-        placeholder={placeholder} 
-      />
+  const KeyInput = ({ icon, label, value, onChange, placeholder }: any) => (
+    <div className="space-y-1.5 group">
+      <div className="flex items-center gap-2 px-1">
+        <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{label}</span>
+      </div>
+      <div className="relative">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-nexus-accent transition-colors">{icon}</div>
+        <input 
+          type="password" 
+          value={value} 
+          onChange={onChange}
+          className="w-full bg-black/40 border border-white/5 text-white rounded-2xl pl-12 pr-4 py-3.5 focus:border-nexus-accent/40 outline-none font-mono text-[11px] placeholder-gray-800 transition-all" 
+          placeholder={placeholder} 
+        />
+      </div>
     </div>
   );
 
@@ -135,39 +140,123 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {showSettingsModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-           <div className="absolute inset-0 bg-black/90 backdrop-blur-2xl" onClick={() => setShowSettingsModal(false)}></div>
-           <div className="glass-panel w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl flex flex-col relative z-[111] max-h-[85vh] border border-white/10 animate-in zoom-in-95 duration-200">
-              <div className="px-6 py-4 flex items-center justify-between border-b border-white/5">
-                <h2 className="text-[10px] font-black text-white uppercase tracking-[0.4em]">Matrix_Control</h2>
-                <button onClick={() => setShowSettingsModal(false)} className="text-gray-600 hover:text-white text-xs">✕</button>
+           <div className="absolute inset-0 bg-black/90 backdrop-blur-2xl animate-in fade-in duration-300" onClick={() => setShowSettingsModal(false)}></div>
+           <div className="glass-panel w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col relative z-[111] max-h-[90vh] border border-white/10 animate-in zoom-in-95 duration-300">
+              
+              <div className="px-8 py-6 flex items-center justify-between border-b border-white/5">
+                <div className="flex flex-col">
+                  <h2 className="text-xs font-black text-white uppercase tracking-[0.4em]">Matrix_Core</h2>
+                  <span className="text-[8px] font-mono text-gray-600 tracking-widest uppercase">Configuration_Module_v2.5</span>
+                </div>
+                <button onClick={() => setShowSettingsModal(false)} className="w-10 h-10 rounded-full hover:bg-white/5 flex items-center justify-center transition-colors">
+                  <XIcon />
+                </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-nexus-950/40">
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-nexus-950/40">
+                 
+                 {/* CATEGORY: API UPLINKS */}
                  <section>
-                    <div className="text-[9px] text-gray-600 uppercase font-black tracking-widest mb-4 flex items-center gap-2"><LinkIcon /> API_UPLINKS</div>
-                    <div className="space-y-3">
-                       <KeyInput icon={<GoogleIcon />} value={tempKeys.google} onChange={(e: any) => setTempKeys({...tempKeys, google: e.target.value})} placeholder={t.googleKeyPlaceholder} />
-                       <KeyInput icon={<DeepSeekIcon />} value={tempKeys.deepseek} onChange={(e: any) => setTempKeys({...tempKeys, deepseek: e.target.value})} placeholder={t.deepseekKeyPlaceholder} />
-                       <KeyInput icon={<GrokIcon />} value={tempKeys.grok} onChange={(e: any) => setTempKeys({...tempKeys, grok: e.target.value})} placeholder={t.grokKeyPlaceholder} />
-                       <KeyInput icon={<AnthropicIcon />} value={tempKeys.anthropic} onChange={(e: any) => setTempKeys({...tempKeys, anthropic: e.target.value})} placeholder={t.anthropicKeyPlaceholder} />
-                       <KeyInput icon={<OpenAIIcon />} value={tempKeys.openai} onChange={(e: any) => setTempKeys({...tempKeys, openai: e.target.value})} placeholder={t.openaiKeyPlaceholder} />
+                    <div className="flex items-center gap-3 mb-6">
+                       <div className="w-1.5 h-6 bg-nexus-accent rounded-full"></div>
+                       <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
+                         <LinkIcon /> Neural_Gateway_Keys
+                       </h3>
+                    </div>
+                    <div className="grid grid-cols-1 gap-5">
+                       <KeyInput icon={<GoogleIcon />} label="Google Gemini" value={tempKeys.google} onChange={(e: any) => setTempKeys({...tempKeys, google: e.target.value})} placeholder={t.googleKeyPlaceholder} />
+                       <KeyInput icon={<DeepSeekIcon />} label="DeepSeek" value={tempKeys.deepseek} onChange={(e: any) => setTempKeys({...tempKeys, deepseek: e.target.value})} placeholder={t.deepseekKeyPlaceholder} />
+                       <KeyInput icon={<GrokIcon />} label="xAI Grok" value={tempKeys.grok} onChange={(e: any) => setTempKeys({...tempKeys, grok: e.target.value})} placeholder={t.grokKeyPlaceholder} />
+                       <KeyInput icon={<AnthropicIcon />} label="Anthropic Claude" value={tempKeys.anthropic} onChange={(e: any) => setTempKeys({...tempKeys, anthropic: e.target.value})} placeholder={t.anthropicKeyPlaceholder} />
+                       <KeyInput icon={<OpenAIIcon />} label="OpenAI GPT" value={tempKeys.openai} onChange={(e: any) => setTempKeys({...tempKeys, openai: e.target.value})} placeholder={t.openaiKeyPlaceholder} />
                     </div>
                  </section>
 
+                 {/* CATEGORY: ENGINE PARAMS */}
                  <section>
-                    <div className="text-[9px] text-gray-600 uppercase font-black tracking-widest mb-4 flex items-center gap-2"><ActivityIcon /> PARAMS</div>
-                    <div className="space-y-4">
-                       <div className="flex items-center justify-between p-3 bg-white/2 rounded-2xl border border-white/5">
-                          <span className="text-[10px] font-bold text-gray-300">Grounding</span>
-                          <button onClick={() => setTempSettings({...tempSettings, useSearch: !tempSettings.useSearch})} className={`w-10 h-5 rounded-full relative transition-all ${tempSettings.useSearch ? 'bg-nexus-accent shadow-glow' : 'bg-white/10'}`}>
-                             <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${tempSettings.useSearch ? 'left-6' : 'left-1'}`}></div>
-                          </button>
+                    <div className="flex items-center gap-3 mb-6">
+                       <div className="w-1.5 h-6 bg-nexus-purple rounded-full"></div>
+                       <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
+                         <ActivityIcon /> Engine_Parameters
+                       </h3>
+                    </div>
+                    <div className="space-y-5">
+                       <div className="p-5 iphone-group bg-white/[0.02] border border-white/5 space-y-6">
+                          <div className="space-y-3">
+                             <div className="flex justify-between text-[10px] font-mono uppercase tracking-widest">
+                               <span className="text-gray-400">Thinking_Budget</span>
+                               <span className="text-nexus-accent">{tempSettings.thinkingBudget} Tokens</span>
+                             </div>
+                             <input 
+                               type="range" min="0" max="32768" step="1024" 
+                               value={tempSettings.thinkingBudget} 
+                               onChange={(e) => setTempSettings({...tempSettings, thinkingBudget: parseInt(e.target.value)})}
+                               className="w-full accent-nexus-accent opacity-70 hover:opacity-100 transition-opacity" 
+                             />
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2">
+                             <div className="flex flex-col">
+                               <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Web_Grounding</span>
+                               <span className="text-[8px] text-gray-600 font-mono">LIVE_SEARCH_PROTOCOL</span>
+                             </div>
+                             <button 
+                               onClick={() => setTempSettings({...tempSettings, useSearch: !tempSettings.useSearch})}
+                               className={`w-12 h-6 rounded-full relative transition-all duration-300 ${tempSettings.useSearch ? 'bg-nexus-accent shadow-glow' : 'bg-white/10'}`}
+                             >
+                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-300 ${tempSettings.useSearch ? 'translate-x-7' : 'translate-x-1'}`}></div>
+                             </button>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2">
+                             <div className="flex flex-col">
+                               <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Autonomous_Agent</span>
+                               <span className="text-[8px] text-gray-600 font-mono">HIGH_AGENCY_MATRIX</span>
+                             </div>
+                             <button 
+                               onClick={() => setTempSettings({...tempSettings, isAgentMode: !tempSettings.isAgentMode})}
+                               className={`w-12 h-6 rounded-full relative transition-all duration-300 ${tempSettings.isAgentMode ? 'bg-nexus-purple shadow-glow' : 'bg-white/10'}`}
+                             >
+                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-300 ${tempSettings.isAgentMode ? 'translate-x-7' : 'translate-x-1'}`}></div>
+                             </button>
+                          </div>
+                       </div>
+                    </div>
+                 </section>
+
+                 {/* CATEGORY: INTERFACE */}
+                 <section>
+                    <div className="flex items-center gap-3 mb-6">
+                       <div className="w-1.5 h-6 bg-nexus-emerald rounded-full"></div>
+                       <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
+                         <GlobeIcon /> Terminal_Interface
+                       </h3>
+                    </div>
+                    <div className="p-5 iphone-group bg-white/[0.02] border border-white/5 space-y-6">
+                       <div className="space-y-3">
+                          <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest px-1">Neural_Accent_Sync</span>
+                          <div className="flex gap-4">
+                            {(['cyan', 'purple', 'emerald'] as const).map(color => (
+                              <button
+                                key={color}
+                                onClick={() => setTempSettings({ ...tempSettings, accentColor: color })}
+                                className={`w-10 h-10 rounded-full border-4 transition-all ${tempSettings.accentColor === color ? 'border-white scale-110 shadow-glow' : 'border-transparent opacity-40 hover:opacity-100'}`}
+                                style={{ backgroundColor: color === 'cyan' ? '#06b6d4' : color === 'purple' ? '#d946ef' : '#10b981' }}
+                              />
+                            ))}
+                          </div>
                        </div>
                     </div>
                  </section>
               </div>
-              <div className="p-6 border-t border-white/5 bg-white/2">
-                 <button onClick={handleSave} disabled={isSaving} className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-2 ${isSaving ? 'bg-emerald-500 text-black' : 'bg-nexus-accent text-black shadow-lg hover:scale-[1.02]'}`}>
-                   {isSaving ? <CheckIcon /> : 'Sync_Core'}
+
+              <div className="p-8 border-t border-white/5 bg-white/2 flex gap-4">
+                 <button 
+                   onClick={handleSave} 
+                   disabled={isSaving} 
+                   className={`flex-1 py-5 rounded-3xl font-black text-[11px] uppercase tracking-[0.4em] transition-all flex items-center justify-center gap-3 ${isSaving ? 'bg-emerald-500 text-black shadow-glow' : 'bg-nexus-accent text-black shadow-lg hover:scale-[1.02] active:scale-95'}`}
+                 >
+                   {isSaving ? <><CheckIcon /> Synchronizing...</> : 'Synchronize_Matrix'}
                  </button>
               </div>
            </div>
