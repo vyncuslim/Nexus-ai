@@ -3,6 +3,7 @@ import { ModelConfig, Persona, Type } from './types';
 import { FunctionDeclaration } from '@google/genai';
 
 export const OWNER_CODE = "NEXUS-0000";
+export const DEFAULT_GOOGLE_CLIENT_ID = "597221340810-08rd8e05gs8cvm32afrk8b5i0prl2n3m.apps.googleusercontent.com";
 
 export const AVAILABLE_MODELS: ModelConfig[] = [
   {

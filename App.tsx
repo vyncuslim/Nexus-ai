@@ -6,7 +6,7 @@ import AuthScreen from './components/AuthScreen';
 import { 
   SendIcon, BrainIcon, LabIcon, MemoryIcon, MenuIcon, AgentIcon, ActivityIcon, LinkIcon, TrashIcon, XIcon
 } from './components/Icon';
-import { AVAILABLE_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, AGENT_INSTRUCTION, UI_TEXT, PERSONAS, DATABASE_TOOLS, OWNER_CODE } from './constants';
+import { AVAILABLE_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, AGENT_INSTRUCTION, UI_TEXT, PERSONAS, DATABASE_TOOLS, OWNER_CODE, DEFAULT_GOOGLE_CLIENT_ID } from './constants';
 import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, GlobalMemory, AppSettings, DatabaseRecord } from './types';
 import { streamGeminiResponse } from './services/geminiService';
 import { useHistory } from './hooks/useHistory';
@@ -19,6 +19,7 @@ function App() {
   const [anthropicKey, setAnthropicKey] = useState<string>('');
   const [deepseekKey, setDeepseekKey] = useState<string>('');
   const [grokKey, setGrokKey] = useState<string>('');
+  const [googleClientId, setGoogleClientId] = useState<string>(DEFAULT_GOOGLE_CLIENT_ID);
   
   const [language, setLanguage] = useState<Language>('en');
   const [labOpen, setLabOpen] = useState(false);
@@ -92,6 +93,7 @@ function App() {
         if (keys.anthropic) setAnthropicKey(keys.anthropic);
         if (keys.deepseek) setDeepseekKey(keys.deepseek);
         if (keys.grok) setGrokKey(keys.grok);
+        if (keys.googleClientId) setGoogleClientId(keys.googleClientId);
       } catch(e) {}
     }
   }, []);
@@ -101,19 +103,28 @@ function App() {
     localStorage.setItem('nexus_app_settings', JSON.stringify(newSettings));
   };
 
-  const handleUpdateApiKeys = (keys: { google?: string, openai?: string, anthropic?: string, deepseek?: string, grok?: string }) => {
+  const handleUpdateUserProfile = (name: string, avatar: string) => {
+    if (!user) return;
+    const updatedUser = { ...user, name, avatar };
+    setUser(updatedUser);
+    localStorage.setItem('nexus_user_v3', JSON.stringify(updatedUser));
+  };
+
+  const handleUpdateApiKeys = (keys: { google?: string, openai?: string, anthropic?: string, deepseek?: string, grok?: string, googleClientId?: string }) => {
     if (keys.google !== undefined) setGoogleKey(keys.google);
     if (keys.openai !== undefined) setOpenaiKey(keys.openai);
     if (keys.anthropic !== undefined) setAnthropicKey(keys.anthropic);
     if (keys.deepseek !== undefined) setDeepseekKey(keys.deepseek);
     if (keys.grok !== undefined) setGrokKey(keys.grok);
+    if (keys.googleClientId !== undefined) setGoogleClientId(keys.googleClientId);
     
     localStorage.setItem('nexus_api_keys', JSON.stringify({
       google: keys.google ?? googleKey,
       openai: keys.openai ?? openaiKey,
       anthropic: keys.anthropic ?? anthropicKey,
       deepseek: keys.deepseek ?? deepseekKey,
-      grok: keys.grok ?? grokKey
+      grok: keys.grok ?? grokKey,
+      googleClientId: keys.googleClientId ?? googleClientId
     }));
   };
 
@@ -227,13 +238,14 @@ function App() {
     }
   }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, getProviderKey, language, settings, globalMemories, database]);
 
-  if (!user) return <AuthScreen onAuthSuccess={(inviteCode, name, keys) => {
+  if (!user) return <AuthScreen onAuthSuccess={(inviteCode, name, keys, avatar) => {
     const isOwner = inviteCode.toUpperCase() === OWNER_CODE;
     const u: User = { 
       id: btoa(inviteCode + name), 
       name, 
       email: inviteCode,
       isOwner,
+      avatar,
       inviteCode: inviteCode.toUpperCase()
     };
     setUser(u); 
@@ -260,15 +272,17 @@ function App() {
         onToggleLanguage={() => setLanguage(language === 'en' ? 'zh' : 'en')} 
         currentPersonaId={currentPersonaId} 
         onUpdatePersona={setCurrentPersonaId} 
-        apiKeys={{ google: googleKey, openai: openaiKey, anthropic: anthropicKey, deepseek: deepseekKey, grok: grokKey }} 
+        apiKeys={{ google: googleKey, openai: openaiKey, anthropic: anthropicKey, deepseek: deepseekKey, grok: grokKey, googleClientId }} 
         onUpdateApiKeys={handleUpdateApiKeys} 
         appSettings={settings} 
         onUpdateSettings={handleUpdateSettings} 
+        onUpdateUserProfile={handleUpdateUserProfile}
         globalMemories={globalMemories} 
         onAddMemory={(c) => setGlobalMemories([{id:uuidv4(),content:c,enabled:true,timestamp:Date.now()}, ...globalMemories])} 
         onDeleteMemory={(id) => setGlobalMemories(globalMemories.filter(m => m.id !== id))} 
       />
-
+      
+      {/* Rest of the UI follows... */}
       <div className={`flex-1 flex flex-col relative transition-all duration-300 ${labOpen ? 'xl:mr-80' : 'mr-0'}`}>
         <header className="h-16 flex items-center justify-between px-6 z-20 border-b border-white/5 bg-nexus-900/40 backdrop-blur-xl">
           <div className="flex items-center gap-4">
@@ -324,7 +338,8 @@ function App() {
           </div>
         </div>
       </div>
-
+      
+      {/* Lab console follows... */}
       <aside className={`fixed inset-y-0 right-0 z-40 w-full sm:w-80 glass-panel border-l transform transition-all duration-500 ease-in-out ${labOpen ? 'translate-x-0' : 'translate-x-full'} bg-nexus-950/95 backdrop-blur-3xl shadow-2xl flex flex-col`}>
         <div className="p-6 border-b border-white/5 flex items-center justify-between">
           <div className="text-[10px] font-black tracking-widest text-white uppercase flex items-center gap-2"><LabIcon /> DATA_CONSOLE</div>

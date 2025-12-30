@@ -3,8 +3,6 @@ import { Language } from '../types';
 import { UI_TEXT, validateInviteCode } from '../constants';
 import { OpenAIIcon, GoogleIcon, DeepSeekIcon, GrokIcon, AnthropicIcon } from './Icon';
 
-declare const google: any;
-
 interface AuthScreenProps {
   onAuthSuccess: (inviteCode: string, name: string, keys: { google?: string, openai?: string, anthropic?: string, deepseek?: string, grok?: string, googleClientId?: string }, avatar?: string) => void;
   language: Language;
@@ -25,12 +23,20 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
 
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateInviteCode(inviteCode)) { setStep(2); setError(null); } else { setError(t.authErrorInvalidCode); }
+    if (validateInviteCode(inviteCode)) { 
+      setStep(2); 
+      setError(null); 
+    } else { 
+      setError(t.authErrorInvalidCode); 
+    }
   };
 
-  const handleManualNameSubmit = (e: React.FormEvent) => {
+  const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) { setStep(3); setError(null); }
+    if (name.trim()) {
+      setStep(3);
+      setError(null);
+    }
   };
 
   const handleFinalSubmit = (e: React.FormEvent) => {
@@ -54,10 +60,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
           <p className="text-[8px] font-mono text-gray-600 tracking-[0.5em] mt-2 uppercase">Mothership_V2.5</p>
         </div>
 
-        <div className="glass-panel rounded-[2.5rem] p-8 shadow-3xl border-white/5 bg-nexus-900/40 backdrop-blur-3xl relative overflow-hidden">
+        <div className="glass-panel rounded-[2.5rem] p-8 shadow-3xl border-white/5 bg-nexus-900/40 backdrop-blur-3xl relative overflow-hidden min-h-[320px] flex flex-col justify-center">
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-nexus-accent/40 to-transparent animate-scan"></div>
           
-          {error && <div className="mb-4 text-center text-red-400 text-[10px] font-bold uppercase tracking-widest animate-pulse">{error}</div>}
+          {error && <div className="mb-4 text-center text-[10px] font-bold uppercase tracking-widest animate-pulse text-red-400">{error}</div>}
 
           {step === 1 && (
             <form onSubmit={handleInviteSubmit} className="space-y-4">
@@ -67,14 +73,37 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
           )}
 
           {step === 2 && (
-            <form onSubmit={handleManualNameSubmit} className="space-y-4 animate-in slide-in-from-right-4">
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-6 py-4 text-center outline-none focus:border-nexus-accent/30 transition-all" placeholder={t.namePlaceholder} autoFocus />
-              <button type="submit" disabled={!name.trim()} className="w-full py-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-lg">Proceed_To_Link</button>
+            <form onSubmit={handleNameSubmit} className="space-y-6 animate-in slide-in-from-right-4 py-4">
+              <div className="text-center space-y-2 mb-4">
+                <h3 className="text-xs font-black text-white uppercase tracking-widest">Connect_Identity</h3>
+                <p className="text-[9px] text-gray-500 font-mono leading-relaxed uppercase">Enter operator name to initialize uplink protocol.</p>
+              </div>
+              <input 
+                type="text" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+                className="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-6 py-4 text-center outline-none focus:border-nexus-accent/30 transition-all font-bold tracking-tight" 
+                placeholder={t.namePlaceholder} 
+                autoFocus 
+              />
+              <button type="submit" disabled={!name.trim()} className="w-full py-4 bg-nexus-accent text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-nexus-accent/90 transition-all active:scale-95 shadow-glow">
+                Confirm_Identity
+              </button>
             </form>
           )}
 
           {step === 3 && (
             <form onSubmit={handleFinalSubmit} className="space-y-3 animate-in slide-in-from-right-4 max-h-[55vh] overflow-y-auto pr-1 custom-scrollbar">
+              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-nexus-accent/20 flex items-center justify-center border border-white/10 overflow-hidden">
+                  <div className="text-nexus-accent font-black uppercase text-sm">{name[0] || '?'}</div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">{name}</span>
+                  <span className="text-[8px] text-nexus-accent font-mono uppercase">Identity_Handshake_Pending</span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 gap-3 pb-4">
                  <div className="relative group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 group-focus-within:text-nexus-accent transition-colors"><GoogleIcon /></div>
