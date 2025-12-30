@@ -220,6 +220,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-300 ${tempSettings.isAgentMode ? 'translate-x-7' : 'translate-x-1'}`}></div>
                              </button>
                           </div>
+
+                          {/* AGENT TYPE SELECTION */}
+                          <div className="flex flex-col gap-3 pt-2">
+                             <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest px-1">Agent_Focus_Class</span>
+                             <div className="grid grid-cols-3 gap-2">
+                               {(['general', 'researcher', 'developer'] as const).map(type => (
+                                 <button
+                                   key={type}
+                                   onClick={() => setTempSettings({ ...tempSettings, agentType: type })}
+                                   className={`py-2 rounded-xl border text-[9px] font-black uppercase tracking-tight transition-all ${tempSettings.agentType === type ? 'bg-nexus-purple/20 border-nexus-purple/40 text-nexus-purple shadow-glow' : 'bg-white/5 border-transparent text-gray-500 hover:text-gray-400'}`}
+                                 >
+                                   {type}
+                                 </button>
+                               ))}
+                             </div>
+                          </div>
                        </div>
                     </div>
                  </section>
