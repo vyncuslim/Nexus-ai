@@ -1,20 +1,27 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
 
-# Run and deploy your AI Studio app
+# Nexus Core AI | Mothership Protocol
 
-This contains everything you need to run your app locally.
+This is the central neural hub for managing intelligent conversations and persistent neural databases.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1Pym5cKnTTec5p6Gf9E5xs7dXQpZNDFrC
+## Access Tokens
 
-## Run Locally
+To enter the Mothership, deploy one of the following neural tokens:
 
-**Prerequisites:**  Node.js
+### Master Uplink (Owner)
+- **Token:** `NEXUS-0000`
+- **Privileges:** Full matrix control, invite generation, registry management.
 
+### Standard Uplinks
+- **NEXUS-0001**
+- **NEXUS-0002**
+- **NEXUS-0003**
+- *And any code in the pattern NEXUS-XXXX (0001-1000)*
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Configuration
+- **Linguistics:** Supports English and Chinese.
+- **Neural Database:** Enabled by default in Agent Mode.
+- **Matrix Uplinks:** Connect your own Gemini, DeepSeek, Grok, Claude, or GPT keys in the Matrix settings.
+
+## System Notes
+- Persistent memory is stored locally in your browser's neural buffer (LocalStorage).
+- Grounding via Google Search is available for up-to-date mission intelligence.

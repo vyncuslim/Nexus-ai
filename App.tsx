@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import MessageBubble from './components/MessageBubble';
@@ -5,7 +6,7 @@ import AuthScreen from './components/AuthScreen';
 import { 
   SendIcon, BrainIcon, LabIcon, MemoryIcon, MenuIcon, AgentIcon, ActivityIcon, LinkIcon, TrashIcon, XIcon
 } from './components/Icon';
-import { AVAILABLE_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, AGENT_INSTRUCTION, UI_TEXT, PERSONAS, DATABASE_TOOLS } from './constants';
+import { AVAILABLE_MODELS, SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_ZH, AGENT_INSTRUCTION, UI_TEXT, PERSONAS, DATABASE_TOOLS, OWNER_CODE } from './constants';
 import { ChatMessage, Role, ModelConfig, ChatSession, User, Language, GlobalMemory, AppSettings, DatabaseRecord } from './types';
 import { streamGeminiResponse } from './services/geminiService';
 import { useHistory } from './hooks/useHistory';
@@ -227,7 +228,14 @@ function App() {
   }, [inputValue, isLoading, sessions, currentSessionId, selectedModel, user, getProviderKey, language, settings, globalMemories, database]);
 
   if (!user) return <AuthScreen onAuthSuccess={(inviteCode, name, keys) => {
-    const u = { id: btoa(inviteCode + name), name, email: inviteCode };
+    const isOwner = inviteCode.toUpperCase() === OWNER_CODE;
+    const u: User = { 
+      id: btoa(inviteCode + name), 
+      name, 
+      email: inviteCode,
+      isOwner,
+      inviteCode: inviteCode.toUpperCase()
+    };
     setUser(u); 
     localStorage.setItem('nexus_user_v3', JSON.stringify(u));
     handleUpdateApiKeys(keys);

@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   PlusIcon, GlobeIcon, LogOutIcon, TrashIcon, 
   SettingsIcon, BrainIcon, GoogleIcon, 
   OpenAIIcon, AnthropicIcon, SearchIcon, ChevronDownIcon,
-  LinkIcon, XIcon, ActivityIcon, DeepSeekIcon, GrokIcon, CheckIcon, AgentIcon, MemoryIcon
+  LinkIcon, XIcon, ActivityIcon, DeepSeekIcon, GrokIcon, CheckIcon, AgentIcon, MemoryIcon, CommandIcon
 } from './Icon';
 import { ChatSession, User, Language, AppSettings, GlobalMemory } from '../types';
 import { UI_TEXT } from '../constants';
@@ -39,15 +40,24 @@ const Sidebar: React.FC<SidebarProps> = ({
   const t = UI_TEXT[language];
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [newMemory, setNewMemory] = useState("");
   const [tempKeys, setTempKeys] = useState(apiKeys);
   const [tempSettings, setTempSettings] = useState<AppSettings>(appSettings);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeCodes, setActiveCodes] = useState<string[]>([]);
 
   useEffect(() => {
     if (showSettingsModal) {
       setTempKeys(apiKeys);
       setTempSettings(appSettings);
+      
+      const stored = localStorage.getItem('nexus_active_codes');
+      if (stored) {
+        setActiveCodes(JSON.parse(stored));
+      } else {
+        const initial = ["NEXUS-0001", "NEXUS-0002", "NEXUS-0003"];
+        localStorage.setItem('nexus_active_codes', JSON.stringify(initial));
+        setActiveCodes(initial);
+      }
     }
   }, [showSettingsModal, apiKeys, appSettings]);
 
@@ -59,6 +69,19 @@ const Sidebar: React.FC<SidebarProps> = ({
       setIsSaving(false);
       setShowSettingsModal(false);
     }, 800);
+  };
+
+  const generateCode = () => {
+    const newCode = `NEXUS-${Math.floor(Math.random() * 9000 + 1000)}`;
+    const updated = [...activeCodes, newCode];
+    setActiveCodes(updated);
+    localStorage.setItem('nexus_active_codes', JSON.stringify(updated));
+  };
+
+  const revokeCode = (code: string) => {
+    const updated = activeCodes.filter(c => c !== code);
+    setActiveCodes(updated);
+    localStorage.setItem('nexus_active_codes', JSON.stringify(updated));
   };
 
   const KeyInput = ({ icon, label, value, onChange, placeholder }: any) => (
@@ -155,6 +178,44 @@ const Sidebar: React.FC<SidebarProps> = ({
 
               <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-nexus-950/40">
                  
+                 {/* CATEGORY: SECURITY & INVITATIONS */}
+                 <section>
+                    <div className="flex items-center gap-3 mb-6">
+                       <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
+                       <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
+                         <CommandIcon /> Access_Control
+                       </h3>
+                    </div>
+                    <div className="p-5 iphone-group bg-white/[0.02] border border-white/5 space-y-4">
+                       <div className="flex items-center justify-between">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Active_Token</span>
+                            <span className="text-[9px] text-nexus-accent font-mono">{user.inviteCode}</span>
+                          </div>
+                          <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${user.isOwner ? 'bg-nexus-purple text-white shadow-glow' : 'bg-gray-800 text-gray-500'}`}>
+                             {user.isOwner ? 'Matrix_Owner' : 'Operator'}
+                          </div>
+                       </div>
+                       
+                       {user.isOwner && (
+                         <div className="pt-4 border-t border-white/5 space-y-4">
+                            <div className="flex items-center justify-between">
+                               <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Active_Invite_Registry</span>
+                               <button onClick={generateCode} className="text-[9px] text-nexus-accent font-black uppercase hover:underline">+ Generate</button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+                               {activeCodes.map(code => (
+                                 <div key={code} className="flex items-center justify-between p-2 bg-black/40 rounded-xl border border-white/5 group">
+                                    <span className="text-[10px] font-mono text-gray-400">{code}</span>
+                                    <button onClick={() => revokeCode(code)} className="opacity-0 group-hover:opacity-100 text-red-500 text-[10px] transition-opacity hover:scale-110">✕</button>
+                                 </div>
+                               ))}
+                            </div>
+                         </div>
+                       )}
+                    </div>
+                 </section>
+
                  {/* CATEGORY: API UPLINKS */}
                  <section>
                     <div className="flex items-center gap-3 mb-6">

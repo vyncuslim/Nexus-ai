@@ -1,5 +1,8 @@
+
 import { ModelConfig, Persona, Type } from './types';
 import { FunctionDeclaration } from '@google/genai';
+
+export const OWNER_CODE = "NEXUS-0000";
 
 export const AVAILABLE_MODELS: ModelConfig[] = [
   {
@@ -92,8 +95,17 @@ export const DATABASE_TOOLS: FunctionDeclaration[] = [
 ];
 
 export const validateInviteCode = (code: string): boolean => {
+  const normalized = code.toUpperCase();
+  if (normalized === OWNER_CODE) return true;
+  
+  const stored = localStorage.getItem('nexus_active_codes');
+  if (stored) {
+    const codes = JSON.parse(stored) as string[];
+    if (codes.includes(normalized)) return true;
+  }
+
   const pattern = /^NEXUS-(\d{4})$/;
-  const match = code.toUpperCase().match(pattern);
+  const match = normalized.match(pattern);
   return !!match && parseInt(match[1], 10) >= 1 && parseInt(match[1], 10) <= 1000;
 };
 

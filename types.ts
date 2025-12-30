@@ -90,6 +90,8 @@ export interface User {
   email: string;
   name: string;
   avatar?: string;
+  isOwner?: boolean;
+  inviteCode?: string;
 }
 
 export interface Persona {
