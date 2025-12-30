@@ -40,7 +40,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const t = UI_TEXT[language];
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const [newMemory, setNewMemory] = useState("");
   
   const [tempKeys, setTempKeys] = useState(apiKeys);
@@ -152,6 +151,50 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className="w-10"></div>
               </div>
               <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-nexus-950/40">
+                 
+                 {/* API UPLINKS SECTION */}
+                 <section>
+                    <div className="px-2 mb-6 text-[10px] text-gray-600 uppercase font-black tracking-widest flex items-center gap-2"><LinkIcon /> API_Uplinks</div>
+                    <div className="space-y-4 px-2">
+                       <div className="space-y-3">
+                          <div className="relative group">
+                             <div className="absolute left-4 top-3.5 text-gray-600 group-focus-within:text-emerald-500 transition-colors"><OpenAIIcon /></div>
+                             <input 
+                               type="password" 
+                               value={tempKeys.openai} 
+                               onChange={(e) => setTempKeys({...tempKeys, openai: e.target.value})}
+                               className="w-full bg-black/40 border border-white/5 text-white rounded-2xl pl-12 pr-4 py-3.5 focus:border-nexus-accent/50 outline-none font-mono text-xs placeholder-gray-800" 
+                               placeholder="OpenAI API Key (sk-...)" 
+                             />
+                          </div>
+                          <div className="relative group">
+                             <div className="absolute left-4 top-3.5 text-gray-600 group-focus-within:text-blue-500 transition-colors"><DeepSeekIcon /></div>
+                             <input 
+                               type="password" 
+                               value={tempKeys.deepseek} 
+                               onChange={(e) => setTempKeys({...tempKeys, deepseek: e.target.value})}
+                               className="w-full bg-black/40 border border-white/5 text-white rounded-2xl pl-12 pr-4 py-3.5 focus:border-nexus-accent/50 outline-none font-mono text-xs placeholder-gray-800" 
+                               placeholder="DeepSeek API Key" 
+                             />
+                          </div>
+                          <div className="relative group">
+                             <div className="absolute left-4 top-3.5 text-gray-600 group-focus-within:text-white transition-colors"><GrokIcon /></div>
+                             <input 
+                               type="password" 
+                               value={tempKeys.grok} 
+                               onChange={(e) => setTempKeys({...tempKeys, grok: e.target.value})}
+                               className="w-full bg-black/40 border border-white/5 text-white rounded-2xl pl-12 pr-4 py-3.5 focus:border-nexus-accent/50 outline-none font-mono text-xs placeholder-gray-800" 
+                               placeholder="Grok API Key" 
+                             />
+                          </div>
+                          <div className="p-3 bg-nexus-accent/5 border border-nexus-accent/10 rounded-xl flex items-center gap-2">
+                             <GoogleIcon />
+                             <span className="text-[8px] font-mono text-nexus-accent/60 uppercase tracking-widest">Gemini_Core: Managed_By_Host</span>
+                          </div>
+                       </div>
+                    </div>
+                 </section>
+
                  <section>
                     <div className="px-2 mb-6 text-[10px] text-gray-600 uppercase font-black tracking-widest flex items-center gap-2"><AgentIcon /> Agent_Neural_Path</div>
                     <div className="space-y-4 px-2">
@@ -168,6 +211,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                        </div>
                     </div>
                  </section>
+
                  <section>
                     <div className="px-2 mb-6 text-[10px] text-gray-600 uppercase font-black tracking-widest flex items-center gap-2"><MemoryIcon /> Persistent_Recall</div>
                     <div className="space-y-4 px-2">
@@ -177,16 +221,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                              <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${tempSettings.useMemories ? 'left-7' : 'left-1'}`}></div>
                           </button>
                        </div>
-                       <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-                          {globalMemories.map(mem => (
-                            <div key={mem.id} className="p-4 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between group">
-                               <span className="text-[10px] text-gray-400 uppercase font-mono line-clamp-1">{mem.content}</span>
-                               <button onClick={() => onDeleteMemory(mem.id)} className="text-red-500/30 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-all">✕</button>
-                            </div>
-                          ))}
-                       </div>
                     </div>
                  </section>
+
                  <section>
                     <div className="px-2 mb-6 text-[10px] text-gray-600 uppercase font-black tracking-widest flex items-center gap-2"><SettingsIcon /> Processing_Params</div>
                     <div className="space-y-6 px-2">

@@ -53,6 +53,11 @@ function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const t = UI_TEXT[language];
 
+  // Fix: Define providerKey in the render scope for use in MessageBubble
+  const providerKey = selectedModel.provider === 'google' 
+    ? (process.env.API_KEY || "") 
+    : (selectedModel.provider === 'openai' ? openaiKey : (selectedModel.provider === 'deepseek' ? deepseekKey : grokKey));
+
   useEffect(() => {
     const root = document.documentElement;
     const colors = { cyan: '#06b6d4', purple: '#d946ef', emerald: '#10b981' };
@@ -65,16 +70,37 @@ function App() {
     const storedSettings = localStorage.getItem('nexus_app_settings');
     const storedMemories = localStorage.getItem('nexus_memories');
     const storedDb = localStorage.getItem('nexus_database');
+    const storedKeys = localStorage.getItem('nexus_api_keys');
     
     if (storedSettings) { try { setSettings(prev => ({ ...prev, ...JSON.parse(storedSettings) })); } catch(e) {} }
     if (storedUser) { try { setUser(JSON.parse(storedUser)); } catch (e) {} }
     if (storedMemories) { try { setGlobalMemories(JSON.parse(storedMemories)); } catch(e) {} }
     if (storedDb) { try { setDatabase(JSON.parse(storedDb)); } catch(e) {} }
+    if (storedKeys) {
+      try {
+        const keys = JSON.parse(storedKeys);
+        if (keys.openai) setOpenaiKey(keys.openai);
+        if (keys.deepseek) setDeepseekKey(keys.deepseek);
+        if (keys.grok) setGrokKey(keys.grok);
+      } catch(e) {}
+    }
   }, []);
 
   const handleUpdateSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
     localStorage.setItem('nexus_app_settings', JSON.stringify(newSettings));
+  };
+
+  const handleUpdateApiKeys = (keys: { openai?: string, deepseek?: string, grok?: string }) => {
+    if (keys.openai !== undefined) setOpenaiKey(keys.openai);
+    if (keys.deepseek !== undefined) setDeepseekKey(keys.deepseek);
+    if (keys.grok !== undefined) setGrokKey(keys.grok);
+    
+    localStorage.setItem('nexus_api_keys', JSON.stringify({
+      openai: keys.openai ?? openaiKey,
+      deepseek: keys.deepseek ?? deepseekKey,
+      grok: keys.grok ?? grokKey
+    }));
   };
 
   const handleSendMessage = useCallback(async () => {
@@ -141,7 +167,6 @@ function App() {
           setIsDbAccessing(true);
           const toolResults = [];
           
-          // Use current database state
           let currentDb = [...database];
           const stored = localStorage.getItem('nexus_database');
           if (stored) currentDb = JSON.parse(stored);
@@ -169,12 +194,10 @@ function App() {
             toolResults.push({ name: call.name, result });
           }
 
-          // Persist changes
           setDatabase(currentDb);
           localStorage.setItem('nexus_database', JSON.stringify(currentDb));
           setIsDbAccessing(false);
 
-          // Return TOOL_RESULT to conversation as a hidden system message
           await executeChatLoop(`TOOL_RESULT: ${JSON.stringify(toolResults)}`, true);
         } else {
           const finalMsg = target!.messages.find(m => m.id === mid);
@@ -193,7 +216,11 @@ function App() {
 
   if (!user) return <AuthScreen onAuthSuccess={(inviteCode, name, keys) => {
     const u = { id: btoa(inviteCode + name), name, email: inviteCode };
-    setUser(u); localStorage.setItem('nexus_user_v3', JSON.stringify(u));
+    setUser(u); 
+    localStorage.setItem('nexus_user_v3', JSON.stringify(u));
+    if (keys.openai || keys.deepseek || keys.grok) {
+      handleUpdateApiKeys({ openai: keys.openai, deepseek: keys.deepseek, grok: keys.grok });
+    }
   }} language={language} />;
 
   const currentMessages = sessions.find(s => s.id === currentSessionId)?.messages || [];
@@ -202,7 +229,27 @@ function App() {
   return (
     <div className="flex h-screen mothership-bg text-slate-300 font-sans overflow-hidden">
       {sidebarOpen && <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <Sidebar isOpen={sidebarOpen} sessions={sessions} currentSessionId={currentSessionId} onNewChat={() => { setCurrentSessionId(null); setSidebarOpen(false); }} onSelectSession={setCurrentSessionId} onDeleteSession={(id) => setSessions(sessions.filter(s => s.id !== id))} user={user} onLogout={() => setUser(null)} language={language} onToggleLanguage={() => setLanguage(language === 'en' ? 'zh' : 'en')} currentPersonaId={currentPersonaId} onUpdatePersona={setCurrentPersonaId} apiKeys={{ google: "", openai: openaiKey, anthropic: "", deepseek: deepseekKey, grok: grokKey }} onUpdateApiKeys={() => {}} appSettings={settings} onUpdateSettings={handleUpdateSettings} globalMemories={globalMemories} onAddMemory={(c) => setGlobalMemories([{id:uuidv4(),content:c,enabled:true,timestamp:Date.now()}, ...globalMemories])} onDeleteMemory={(id) => setGlobalMemories(globalMemories.filter(m => m.id !== id))} />
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        sessions={sessions} 
+        currentSessionId={currentSessionId} 
+        onNewChat={() => { setCurrentSessionId(null); setSidebarOpen(false); }} 
+        onSelectSession={setCurrentSessionId} 
+        onDeleteSession={(id) => setSessions(sessions.filter(s => s.id !== id))} 
+        user={user} 
+        onLogout={() => setUser(null)} 
+        language={language} 
+        onToggleLanguage={() => setLanguage(language === 'en' ? 'zh' : 'en')} 
+        currentPersonaId={currentPersonaId} 
+        onUpdatePersona={setCurrentPersonaId} 
+        apiKeys={{ google: "HIDDEN_SYSTEM_KEY", openai: openaiKey, anthropic: "", deepseek: deepseekKey, grok: grokKey }} 
+        onUpdateApiKeys={handleUpdateApiKeys} 
+        appSettings={settings} 
+        onUpdateSettings={handleUpdateSettings} 
+        globalMemories={globalMemories} 
+        onAddMemory={(c) => setGlobalMemories([{id:uuidv4(),content:c,enabled:true,timestamp:Date.now()}, ...globalMemories])} 
+        onDeleteMemory={(id) => setGlobalMemories(globalMemories.filter(m => m.id !== id))} 
+      />
 
       <div className={`flex-1 flex flex-col relative transition-all duration-300 ${labOpen ? 'xl:mr-80' : 'mr-0'}`}>
         <header className="h-16 flex items-center justify-between px-6 z-20 border-b border-white/5 bg-nexus-900/40 backdrop-blur-xl">
@@ -241,7 +288,7 @@ function App() {
               </div>
             ) : (
               <div className="space-y-8 pb-32">
-                {currentMessages.map((msg) => (<MessageBubble key={msg.id} message={msg} apiContext={{ apiKey: process.env.API_KEY || "", provider: 'google' }} />))}
+                {currentMessages.map((msg) => (<MessageBubble key={msg.id} message={msg} apiContext={{ apiKey: providerKey, provider: selectedModel.provider }} />))}
                 <div ref={messagesEndRef} />
               </div>
             )}

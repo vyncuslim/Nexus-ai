@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
-import { Language } from '../types';
-import { UI_TEXT, validateInviteCode } from '../constants';
-import { OpenAIIcon } from './Icon';
+import { Language } from './types';
+import { UI_TEXT, validateInviteCode } from './constants';
+import { OpenAIIcon } from './components/Icon';
 
 interface AuthScreenProps {
   onAuthSuccess: (inviteCode: string, name: string, keys: { openai?: string, google?: string }) => void;
@@ -68,7 +69,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
                 {t.welcomeTitle}
               </h1>
               <p className="text-gray-400 text-xs uppercase tracking-widest">
-                {step === 1 ? t.loginTitle : step === 2 ? t.joinNexus : "Credentials"}
+                {/* Fix: Using hardcoded strings instead of non-existent UI_TEXT keys */}
+                {step === 1 ? "MOTHERSHIP_LOGIN" : step === 2 ? "IDENTITY_LINK" : "Credentials"}
               </p>
             </div>
 
@@ -142,7 +144,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
                 </div>
 
                 <p className="text-[10px] text-gray-500 text-center">
-                  {t.optional}
+                  {/* Fix: Hardcoded text instead of non-existent t.optional */}
+                  Uplink Configuration Optional
                 </p>
                  <button 
                   type="submit"

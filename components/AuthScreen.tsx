@@ -53,7 +53,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
 
   const handleManualNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) setStep(3);
+    if (name.trim()) {
+      setError(null);
+      setStep(3);
+    }
   };
 
   const startGoogleAuth = () => {
@@ -95,7 +98,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
             if (err.type === 'popup_closed') {
                 setError(
                   <div className="text-left space-y-2">
-                    <p className="font-bold text-red-400 text-xs">Sign-In window closed immediately.</p>
+                    <p className="font-bold text-red-400 text-xs text-center">Sign-In window closed immediately.</p>
                     <p className="text-[10px] text-gray-400">This usually happens if the origin is not authorized. Origin:</p>
                     <div className="bg-black/50 p-2 rounded font-mono text-[9px] break-all border border-nexus-700">
                       {window.location.origin}
@@ -152,22 +155,33 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language, initia
             </div>
 
             {error && (
-                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-200 text-xs text-center font-medium leading-relaxed animate-in fade-in zoom-in-95">
+                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-200 text-xs font-medium leading-relaxed animate-in fade-in zoom-in-95 flex items-center justify-center gap-2">
+                  <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
                   {error}
                 </div>
             )}
 
             {step === 1 && (
               <form onSubmit={handleInviteSubmit} className="space-y-6">
-                <input 
-                  type="text" 
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                  className="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-6 py-4 focus:border-cyan-500/50 outline-none text-center font-mono text-base uppercase tracking-widest placeholder-gray-800 shadow-inner"
-                  placeholder={t.invitePlaceholder}
-                  autoFocus
-                />
-                <button type="submit" disabled={!inviteCode} className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-2xl font-bold shadow-xl shadow-cyan-500/10 transition-all active:scale-95 disabled:opacity-30">{t.nextBtn}</button>
+                <div className="relative">
+                    <input 
+                    type="text" 
+                    value={inviteCode}
+                    onChange={(e) => {
+                        setInviteCode(e.target.value.toUpperCase());
+                        if (error) setError(null);
+                    }}
+                    className={`
+                        w-full bg-black/40 text-white rounded-2xl px-6 py-4 outline-none text-center font-mono text-base uppercase tracking-widest placeholder-gray-800 shadow-inner transition-all duration-300
+                        ${error ? 'border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'border border-white/10 focus:border-cyan-500/50'}
+                    `}
+                    placeholder={t.invitePlaceholder}
+                    autoFocus
+                    />
+                </div>
+                <button type="submit" disabled={!inviteCode} className={`w-full py-4 rounded-2xl font-bold shadow-xl transition-all active:scale-95 disabled:opacity-30 ${error ? 'bg-red-950/30 text-red-400 border border-red-500/30' : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-500/10'}`}>
+                    {error ? 'Retry Authorization' : t.nextBtn}
+                </button>
               </form>
             )}
 
