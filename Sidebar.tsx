@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   PlusIcon, GlobeIcon, LogOutIcon, TrashIcon, 
@@ -39,14 +40,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   const t = UI_TEXT[language];
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [tempKeys, setTempKeys] = useState(apiKeys);
   const [tempSettings, setTempSettings] = useState<AppSettings>(appSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [activeCodes, setActiveCodes] = useState<string[]>([]);
 
   useEffect(() => {
     if (showSettingsModal) {
-      setTempKeys(apiKeys);
       setTempSettings(appSettings);
       
       const stored = localStorage.getItem('nexus_active_codes');
@@ -58,12 +57,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         setActiveCodes(initial);
       }
     }
-  }, [showSettingsModal, apiKeys, appSettings]);
+  }, [showSettingsModal, appSettings]);
 
   const handleSave = () => {
     setIsSaving(true);
-    // Persist temporary state to the application state and localStorage via props
-    onUpdateApiKeys(tempKeys);
     onUpdateSettings(tempSettings);
     setTimeout(() => {
       setIsSaving(false);
@@ -83,24 +80,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     setActiveCodes(updated);
     localStorage.setItem('nexus_active_codes', JSON.stringify(updated));
   };
-
-  const KeyInput = ({ icon, label, value, onChange, placeholder }: any) => (
-    <div className="space-y-1.5 group">
-      <div className="flex items-center gap-2 px-1">
-        <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{label}</span>
-      </div>
-      <div className="relative">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-nexus-accent transition-colors">{icon}</div>
-        <input 
-          type="password" 
-          value={value} 
-          onChange={onChange}
-          className="w-full bg-black/40 border border-white/5 text-white rounded-2xl pl-12 pr-4 py-3.5 focus:border-nexus-accent/40 outline-none font-mono text-[11px] placeholder-gray-800 transition-all" 
-          placeholder={placeholder} 
-        />
-      </div>
-    </div>
-  );
 
   return (
     <>
@@ -149,7 +128,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div className="flex items-center justify-between p-3 glass-panel rounded-2xl border-white/10">
                <div className="flex items-center gap-3 min-w-0">
-                 <div className="w-8 h-8 rounded-xl bg-nexus-accent/20 flex items-center justify-center border border-white/10 text-[10px] font-black text-nexus-accent uppercase">{user.avatar ? <img src={user.avatar} className="w-full h-full object-cover rounded-xl" /> : user.name[0]}</div>
+                 <div className="w-8 h-8 rounded-xl bg-nexus-accent/20 flex items-center justify-center border border-white/10 text-[10px] font-black text-nexus-accent uppercase overflow-hidden">
+                    {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <div className="text-nexus-accent font-black uppercase text-[10px]">{user.name[0]}</div>}
+                 </div>
                  <div className="flex flex-col min-w-0 leading-tight">
                     <span className="text-xs font-black text-white truncate uppercase tracking-tighter">{user.name}</span>
                     <span className="text-[8px] text-gray-600 font-mono tracking-widest uppercase">Operator</span>
@@ -178,7 +159,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
               <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-nexus-950/40">
                  
-                 {/* CATEGORY: SECURITY & INVITATIONS */}
                  <section>
                     <div className="flex items-center gap-3 mb-6">
                        <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
@@ -216,24 +196,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                  </section>
 
-                 {/* CATEGORY: API UPLINKS */}
-                 <section>
-                    <div className="flex items-center gap-3 mb-6">
-                       <div className="w-1.5 h-6 bg-nexus-accent rounded-full"></div>
-                       <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
-                         <LinkIcon /> Neural_Gateway_Keys
-                       </h3>
-                    </div>
-                    <div className="grid grid-cols-1 gap-5">
-                       <KeyInput icon={<GoogleIcon />} label="Google Gemini API" value={tempKeys.google} onChange={(e: any) => setTempKeys({...tempKeys, google: e.target.value})} placeholder={t.googleKeyPlaceholder} />
-                       <KeyInput icon={<AnthropicIcon />} label="Anthropic Claude API" value={tempKeys.anthropic} onChange={(e: any) => setTempKeys({...tempKeys, anthropic: e.target.value})} placeholder={t.anthropicKeyPlaceholder} />
-                       <KeyInput icon={<OpenAIIcon />} label="OpenAI GPT API" value={tempKeys.openai} onChange={(e: any) => setTempKeys({...tempKeys, openai: e.target.value})} placeholder={t.openaiKeyPlaceholder} />
-                       <KeyInput icon={<GrokIcon />} label="xAI Grok API" value={tempKeys.grok} onChange={(e: any) => setTempKeys({...tempKeys, grok: e.target.value})} placeholder={t.grokKeyPlaceholder} />
-                       <KeyInput icon={<DeepSeekIcon />} label="DeepSeek API" value={tempKeys.deepseek} onChange={(e: any) => setTempKeys({...tempKeys, deepseek: e.target.value})} placeholder={t.deepseekKeyPlaceholder} />
-                    </div>
-                 </section>
-
-                 {/* CATEGORY: ENGINE PARAMS */}
                  <section>
                     <div className="flex items-center gap-3 mb-6">
                        <div className="w-1.5 h-6 bg-nexus-purple rounded-full"></div>
@@ -267,60 +229,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                              >
                                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-300 ${tempSettings.useSearch ? 'translate-x-7' : 'translate-x-1'}`}></div>
                              </button>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2">
-                             <div className="flex flex-col">
-                               <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Autonomous_Agent</span>
-                               <span className="text-[8px] text-gray-600 font-mono">HIGH_AGENCY_MATRIX</span>
-                             </div>
-                             <button 
-                               onClick={() => setTempSettings({...tempSettings, isAgentMode: !tempSettings.isAgentMode})}
-                               className={`w-12 h-6 rounded-full relative transition-all duration-300 ${tempSettings.isAgentMode ? 'bg-nexus-purple shadow-glow' : 'bg-white/10'}`}
-                             >
-                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-300 ${tempSettings.isAgentMode ? 'translate-x-7' : 'translate-x-1'}`}></div>
-                             </button>
-                          </div>
-
-                          {/* AGENT TYPE SELECTION */}
-                          <div className="flex flex-col gap-3 pt-2">
-                             <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest px-1">Agent_Focus_Class</span>
-                             <div className="grid grid-cols-3 gap-2">
-                               {(['general', 'researcher', 'developer'] as const).map(type => (
-                                 <button
-                                   key={type}
-                                   onClick={() => setTempSettings({ ...tempSettings, agentType: type })}
-                                   className={`py-2 rounded-xl border text-[9px] font-black uppercase tracking-tight transition-all ${tempSettings.agentType === type ? 'bg-nexus-purple/20 border-nexus-purple/40 text-nexus-purple shadow-glow' : 'bg-white/5 border-transparent text-gray-500 hover:text-gray-400'}`}
-                                 >
-                                   {type}
-                                 </button>
-                               ))}
-                             </div>
-                          </div>
-                       </div>
-                    </div>
-                 </section>
-
-                 {/* CATEGORY: INTERFACE */}
-                 <section>
-                    <div className="flex items-center gap-3 mb-6">
-                       <div className="w-1.5 h-6 bg-nexus-emerald rounded-full"></div>
-                       <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
-                         <GlobeIcon /> Terminal_Interface
-                       </h3>
-                    </div>
-                    <div className="p-5 iphone-group bg-white/[0.02] border border-white/5 space-y-6">
-                       <div className="space-y-3">
-                          <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest px-1">Neural_Accent_Sync</span>
-                          <div className="flex gap-4">
-                            {(['cyan', 'purple', 'emerald'] as const).map(color => (
-                              <button
-                                key={color}
-                                onClick={() => setTempSettings({ ...tempSettings, accentColor: color })}
-                                className={`w-10 h-10 rounded-full border-4 transition-all ${tempSettings.accentColor === color ? 'border-white scale-110 shadow-glow' : 'border-transparent opacity-40 hover:opacity-100'}`}
-                                style={{ backgroundColor: color === 'cyan' ? '#06b6d4' : color === 'purple' ? '#d946ef' : '#10b981' }}
-                              />
-                            ))}
                           </div>
                        </div>
                     </div>
