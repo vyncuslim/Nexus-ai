@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   PlusIcon, GlobeIcon, LogOutIcon, TrashIcon, 
@@ -226,11 +225,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                        </h3>
                     </div>
                     <div className="grid grid-cols-1 gap-5">
-                       <KeyInput icon={<GoogleIcon />} label="Google Gemini" value={tempKeys.google} onChange={(e: any) => setTempKeys({...tempKeys, google: e.target.value})} placeholder={t.googleKeyPlaceholder} />
-                       <KeyInput icon={<AnthropicIcon />} label="Anthropic Claude" value={tempKeys.anthropic} onChange={(e: any) => setTempKeys({...tempKeys, anthropic: e.target.value})} placeholder={t.anthropicKeyPlaceholder} />
-                       <KeyInput icon={<OpenAIIcon />} label="OpenAI GPT" value={tempKeys.openai} onChange={(e: any) => setTempKeys({...tempKeys, openai: e.target.value})} placeholder={t.openaiKeyPlaceholder} />
-                       <KeyInput icon={<GrokIcon />} label="xAI Grok" value={tempKeys.grok} onChange={(e: any) => setTempKeys({...tempKeys, grok: e.target.value})} placeholder={t.grokKeyPlaceholder} />
-                       <KeyInput icon={<DeepSeekIcon />} label="DeepSeek" value={tempKeys.deepseek} onChange={(e: any) => setTempKeys({...tempKeys, deepseek: e.target.value})} placeholder={t.deepseekKeyPlaceholder} />
+                       <KeyInput icon={<GoogleIcon />} label="Google Gemini API" value={tempKeys.google} onChange={(e: any) => setTempKeys({...tempKeys, google: e.target.value})} placeholder={t.googleKeyPlaceholder} />
+                       <KeyInput icon={<AnthropicIcon />} label="Anthropic Claude API" value={tempKeys.anthropic} onChange={(e: any) => setTempKeys({...tempKeys, anthropic: e.target.value})} placeholder={t.anthropicKeyPlaceholder} />
+                       <KeyInput icon={<OpenAIIcon />} label="OpenAI GPT API" value={tempKeys.openai} onChange={(e: any) => setTempKeys({...tempKeys, openai: e.target.value})} placeholder={t.openaiKeyPlaceholder} />
+                       <KeyInput icon={<GrokIcon />} label="xAI Grok API" value={tempKeys.grok} onChange={(e: any) => setTempKeys({...tempKeys, grok: e.target.value})} placeholder={t.grokKeyPlaceholder} />
+                       <KeyInput icon={<DeepSeekIcon />} label="DeepSeek API" value={tempKeys.deepseek} onChange={(e: any) => setTempKeys({...tempKeys, deepseek: e.target.value})} placeholder={t.deepseekKeyPlaceholder} />
                     </div>
                  </section>
 

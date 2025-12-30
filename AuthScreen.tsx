@@ -54,46 +54,58 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language }) => {
           <h1 className="text-xl font-black italic text-white uppercase tracking-tighter">{t.welcomeTitle}</h1>
         </div>
 
-        <div className="glass-panel rounded-[2rem] p-8 shadow-3xl border-white/5 bg-nexus-900/40 backdrop-blur-3xl">
+        <div className="glass-panel rounded-[2rem] p-8 shadow-3xl border-white/5 bg-nexus-900/40 backdrop-blur-3xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-nexus-accent/40 to-transparent animate-scan"></div>
+          
           {error && <div className="mb-4 text-center text-red-400 text-[10px] font-bold uppercase tracking-widest animate-pulse">{error}</div>}
 
           {step === 1 && (
             <form onSubmit={handleInviteSubmit} className="space-y-4">
-              <input type="text" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} className="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-6 py-4 text-center font-mono uppercase tracking-widest outline-none focus:border-cyan-500/30" placeholder={t.invitePlaceholder} autoFocus />
-              <button type="submit" disabled={!inviteCode} className="w-full py-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-all">{t.nextBtn}</button>
+              <input type="text" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} className="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-6 py-4 text-center font-mono uppercase tracking-widest outline-none focus:border-cyan-500/30 transition-all" placeholder={t.invitePlaceholder} autoFocus />
+              <button type="submit" disabled={!inviteCode} className="w-full py-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-all disabled:opacity-20">{t.nextBtn}</button>
             </form>
           )}
 
           {step === 2 && (
             <form onSubmit={handleManualNameSubmit} className="space-y-4 animate-in slide-in-from-right-4">
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-6 py-4 text-center outline-none focus:border-cyan-500/30" placeholder={t.namePlaceholder} autoFocus />
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-6 py-4 text-center outline-none focus:border-cyan-500/30 transition-all" placeholder={t.namePlaceholder} autoFocus />
               <button type="submit" disabled={!name.trim()} className="w-full py-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-all">Proceed</button>
             </form>
           )}
 
           {step === 3 && (
-            <form onSubmit={handleFinalSubmit} className="space-y-3 animate-in slide-in-from-right-4 max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
+            <form onSubmit={handleFinalSubmit} className="space-y-3 animate-in slide-in-from-right-4 max-h-[55vh] overflow-y-auto pr-1 custom-scrollbar">
               <div className="grid grid-cols-1 gap-2 pb-4">
                  <div className="relative group">
-                    <div className="absolute left-4 top-3.5 text-gray-700 group-focus-within:text-nexus-accent"><GoogleIcon /></div>
-                    <input type="password" value={googleKey} onChange={(e) => setGoogleKey(e.target.value)} className="w-full bg-black/40 border border-white/5 text-white rounded-xl pl-11 py-3 text-[10px] outline-none font-mono" placeholder={t.googleKeyPlaceholder} />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 group-focus-within:text-nexus-accent transition-colors"><GoogleIcon /></div>
+                    <input type="password" value={googleKey} onChange={(e) => setGoogleKey(e.target.value)} className="w-full bg-black/40 border border-white/5 text-white rounded-xl pl-12 pr-4 py-3.5 text-[10px] outline-none font-mono focus:border-nexus-accent/30" placeholder={t.googleKeyPlaceholder} />
                  </div>
                  <div className="relative group">
-                    <div className="absolute left-4 top-3.5 text-gray-700"><DeepSeekIcon /></div>
-                    <input type="password" value={deepseekKey} onChange={(e) => setDeepseekKey(e.target.value)} className="w-full bg-black/40 border border-white/5 text-white rounded-xl pl-11 py-3 text-[10px] outline-none font-mono" placeholder={t.deepseekKeyPlaceholder} />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 group-focus-within:text-orange-400 transition-colors"><AnthropicIcon /></div>
+                    <input type="password" value={anthropicKey} onChange={(e) => setAnthropicKey(e.target.value)} className="w-full bg-black/40 border border-white/5 text-white rounded-xl pl-12 pr-4 py-3.5 text-[10px] outline-none font-mono focus:border-nexus-accent/30" placeholder={t.anthropicKeyPlaceholder} />
                  </div>
                  <div className="relative group">
-                    <div className="absolute left-4 top-3.5 text-gray-700"><GrokIcon /></div>
-                    <input type="password" value={grokKey} onChange={(e) => setGrokKey(e.target.value)} className="w-full bg-black/40 border border-white/5 text-white rounded-xl pl-11 py-3 text-[10px] outline-none font-mono" placeholder={t.grokKeyPlaceholder} />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 group-focus-within:text-blue-500 transition-colors"><DeepSeekIcon /></div>
+                    <input type="password" value={deepseekKey} onChange={(e) => setDeepseekKey(e.target.value)} className="w-full bg-black/40 border border-white/5 text-white rounded-xl pl-12 pr-4 py-3.5 text-[10px] outline-none font-mono focus:border-nexus-accent/30" placeholder={t.deepseekKeyPlaceholder} />
                  </div>
                  <div className="relative group">
-                    <div className="absolute left-4 top-3.5 text-gray-700"><OpenAIIcon /></div>
-                    <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} className="w-full bg-black/40 border border-white/5 text-white rounded-xl pl-11 py-3 text-[10px] outline-none font-mono" placeholder={t.openaiKeyPlaceholder} />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 group-focus-within:text-white transition-colors"><GrokIcon /></div>
+                    <input type="password" value={grokKey} onChange={(e) => setGrokKey(e.target.value)} className="w-full bg-black/40 border border-white/5 text-white rounded-xl pl-12 pr-4 py-3.5 text-[10px] outline-none font-mono focus:border-nexus-accent/30" placeholder={t.grokKeyPlaceholder} />
+                 </div>
+                 <div className="relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 group-focus-within:text-emerald-500 transition-colors"><OpenAIIcon /></div>
+                    <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} className="w-full bg-black/40 border border-white/5 text-white rounded-xl pl-12 pr-4 py-3.5 text-[10px] outline-none font-mono focus:border-nexus-accent/30" placeholder={t.openaiKeyPlaceholder} />
                  </div>
               </div>
-              <button type="submit" className="w-full py-4 bg-cyan-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-glow hover:bg-cyan-500 transition-all">{t.connectBtn}</button>
+              <button type="submit" className="w-full py-4 bg-nexus-accent text-black rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-glow hover:bg-nexus-accent/90 transition-all sticky bottom-0">{t.connectBtn}</button>
             </form>
           )}
+          
+          <div className="mt-8 flex justify-center gap-2">
+             <div className={`h-1 rounded-full transition-all duration-300 ${step >= 1 ? 'w-6 bg-nexus-accent' : 'w-2 bg-white/5'}`}></div>
+             <div className={`h-1 rounded-full transition-all duration-300 ${step >= 2 ? 'w-6 bg-nexus-accent' : 'w-2 bg-white/5'}`}></div>
+             <div className={`h-1 rounded-full transition-all duration-300 ${step >= 3 ? 'w-6 bg-nexus-accent' : 'w-2 bg-white/5'}`}></div>
+          </div>
         </div>
       </div>
     </div>
